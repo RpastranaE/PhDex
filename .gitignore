@@ -1,0 +1,14 @@
+datos_app/
+__pycache__/
+*.py[cod]
+*.sqlite*
+*.db
+*.log
+*.tmp
+.env*
+catalogo_notion.json
+*respaldo*/
+qa_*/
+Prueba*.png
+.DS_Store
+Thumbs.db

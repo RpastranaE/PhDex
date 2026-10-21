@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PhDex — Gestión de archivos</title><link rel="icon" href="/phdex.ico"><link rel="stylesheet" href="/style.css">
+  <script src="/metadata-model.js" defer></script><script src="/app.js" defer></script>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand"><img src="/phdex-icon.png" alt=""><div>PhDex</div></div>
+  
+  <nav aria-label="Secciones">
+    <button class="nav-item active" data-view="batch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nuevo lote</button>
+    <button class="nav-item" data-view="library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v7H4zM14 4h6v7h-6zM4 15h6v5H4zM14 15h6v5h-6z"/></svg>Plantillas y favoritos</button>
+    <button class="nav-item" data-view="history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-7M3 3v5h5M12 7v5l3 2"/></svg>Historial</button>
+    <button class="nav-item" data-view="audit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 12 2 2 4-4M12 3l8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6z"/></svg>Auditoría</button>
+    <button class="nav-item" data-view="guide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v16H4zM11 4h9v16h-9M7 8h1M14 8h3M14 12h3"/></svg>Ayuda</button>
+  </nav>
+  <div class="sidebar-note"><button id="shutdown" class="quiet">Cerrar aplicación</button></div>
+</aside>
+<main>
+  <header class="topbar"><div class="breadcrumb">PhDex <span>/</span> <strong id="section-name">Nuevo lote</strong></div><a class="header-help" href="#" id="header-help">Ayuda</a></header>
+  <section id="view-batch" class="view wizard">
+    <div class="page-heading"><div><h1 id="wizard-title">Nuevo lote</h1><p id="wizard-help">Selecciona los archivos que quieres organizar.</p></div></div>
+    <div class="mode-switch"><label for="work-mode">Modo</label><select id="work-mode"><option value="quick">Modo rápido · 3 pasos</option><option value="full">Formulario completo · 4 pasos</option></select></div>
+    <div class="workflow" aria-label="Progreso del lote">
+      <span data-progress="1"><b>1</b> Archivos</span><span class="line"></span><span data-progress="2"><b>2</b> Datos</span><span class="line"></span><span data-progress="3"><b>3</b> Destino</span><span class="line"></span><span data-progress="4"><b>4</b> Revisar</span>
+    </div>
+    <div class="wizard-panel" data-step="1"><section class="card source-card">
+          <div class="card-heading"><div><h2>Archivos de entrada</h2><p>Añade archivos desde la carpeta de entrada o desde otra ubicación.</p></div></div>
+          <div class="source-actions"><select id="inbox" aria-label="Bandeja de Doctorado"></select><button id="open-inbox" class="button primary-soft">Revisar Entrada</button></div><p class="field-hint">Selecciona una carpeta y abre su contenido para elegir los archivos.</p><details class="other-sources"><summary>Añadir desde otra ubicación</summary><div class="source-actions"><button id="pick-files" class="button primary-soft">Seleccionar archivos</button><button id="pick-input" class="button">Explorar otra carpeta</button><button id="pick-package" class="button">Copiar una carpeta entera</button></div>
+          
+          <p class="field-hint"><strong>Explorar</strong> permite elegir elementos de una carpeta. <strong>Copiar una carpeta entera</strong> añade todo su contenido como una unidad; útil para datos de equipos con archivos auxiliares.</p><div class="path-input"><input id="input-path" aria-label="Ruta de entrada" placeholder="O pega una ruta completa de archivo o carpeta…"><button id="add-path" class="button small">Añadir</button><button id="list-input" class="icon-button" aria-label="Explorar el contenido de la ruta de entrada" title="Ver contenido de la carpeta">▤</button></div>
+          </details><div id="empty-files" class="empty-files"><h3>No hay archivos seleccionados</h3><p>Abre la carpeta de entrada o utiliza Seleccionar archivos.</p></div>
+          <div id="files-area" hidden><div class="list-toolbar"><label><input id="select-all" type="checkbox" checked> Seleccionar todos</label><span id="file-count"></span><button id="clear-files" class="text-button">Vaciar lote</button></div><div id="file-list" class="file-list"></div></div>
+        </section></div>
+    <div class="wizard-panel" data-step="2" hidden><section class="card metadata-card">
+        <div class="card-heading"><div><h2>Indica a qué corresponde</h2><p>Completa el registro y la descripción de cada archivo.</p></div></div>
+        <div id="metadata-files" class="metadata-editors"></div>
+        <details class="bulk-panel"><summary>Aplicar datos a varios archivos (opcional)</summary><p>Marca los archivos en sus filas y los campos que quieres copiar. Solo se cambian al pulsar Aplicar.</p><div id="bulk-fields" class="bulk-fields"></div>
+        <form id="metadata-form">
+          <label for="category">Tipo de archivo</label><select id="category"></select>
+          <div id="raw-note" class="info-note" hidden></div>
+          <label id="raw-confirm-wrap" class="check-row" hidden><input id="raw-confirm" type="checkbox"><span>Confirmo que es un archivo RAW independiente, sin auxiliares que dependan de su nombre.</span></label>
+          <div class="form-divider"></div>
+          <div class="form-pair owner-pair"><div><label for="owner-kind">Pertenece a</label><select id="owner-kind"><option value="characterization">Caracterización · CAR</option><option value="experiment">Experimento · EXP</option><option value="sample">Muestra · MUE</option><option value="result">Resultado · RES</option><option value="other">Otro tipo de registro</option></select></div><div><label for="owner-code">ID del registro <span class="required">*</span></label><input id="owner-code" placeholder="CAR-…" autocomplete="off"></div></div>
+          <div id="owner-status" class="field-hint">Identificador del registro, por ejemplo CAR-27.</div>
+          <label for="file-date">Fecha del archivo <span class="required">*</span></label><input id="file-date" type="date"><div class="field-hint">Adquisición para datos; emisión para justificantes; creación para textos.</div>
+          <label for="content">Contenido / descripción breve</label><input id="content" placeholder="Vacío: utilizar el nombre original"><div class="field-hint">Por ejemplo: Espectro, Ajuste_bandas o Figura_espectros.</div>
+          <div class="form-pair"><div><label for="technique">Técnica <span class="optional">opcional</span></label><input id="technique" placeholder="Por ejemplo FTIR-ATR"></div><div><label for="samples">Muestra(s) <span class="optional">opcional</span></label><input id="samples" placeholder="MUE-8, MUE-9"></div></div>
+          <div class="form-pair"><div><label for="replicate">Réplica <span class="optional">rNN</span></label><input id="replicate" type="number" min="0" max="999" value="0"></div><div><label for="version">Versión <span class="optional">vNN</span></label><input id="version" type="number" min="0" max="999" value="1"></div></div>
+          <div class="field-hint">0 = sin sufijo. Una réplica es otra adquisición; una versión es otro análisis o documento.</div>
+          <details class="related-details"><summary>Más relaciones y observaciones</summary><label for="experiments">Experimento(s) relacionado(s)</label><input id="experiments" placeholder="EXP-12, EXP-13"><label for="characterizations">Caracterización(es) relacionada(s)</label><input id="characterizations" placeholder="CAR-27, CAR-28"><label for="note">Observación para el registro</label><textarea id="note" rows="2" placeholder="Método de procesamiento, contexto o comentario…"></textarea></details>
+        </form><button id="apply-bulk" class="button">Aplicar a las filas marcadas</button><p id="bulk-status" role="status"></p></details>
+        <div class="name-example"><div class="eyebrow">REGLA DEL ESPACIO DOCTORADO</div><code>AAAA-MM-DD_ID[_MUE-ID]<br>[_Tecnica]_Contenido[_rNN][_vNN].ext</code></div>
+      </section></div>
+    <div class="wizard-panel" data-step="3" hidden><section class="card destination-card">
+          <div class="card-heading"><div><h2>Elige dónde guardarlos</h2><p>Haz clic en el campo para elegir una carpeta existente, como DRX. Para una nueva, usa + Añadir carpeta.</p></div></div>
+
+
+          <p class="field-hint">+ Añadir carpeta la crea al momento. Solo puedes eliminar carpetas creadas desde esta sesión y que sigan vacías. Las carpetas anteriores quedan protegidas.</p>
+          <details class="related-details"><summary>Elegir una salida manual u otra operación</summary>          <div class="mode-options"><label><input type="radio" name="mode" value="copy" checked><span><strong>Exportar una copia</strong><small>Conserva el archivo original.</small></span></label><label><input type="radio" name="mode" value="rename"><span><strong>Renombrar en origen</strong><small>Solo archivos de trabajo; misma carpeta.</small></span></label></div>
+          <div id="output-controls"><label for="output-path">Salida común opcional (solo archivos sin ruta propia)</label><div class="path-input"><input id="output-path" placeholder="Selecciona o pega la carpeta de salida"><button id="pick-output" class="button">Elegir carpeta</button></div></div>
+</details><h3>Destino de cada archivo</h3><div id="destinations-list"></div><p id="drive-note" class="info-note">Si utilizas Drive, comprueba que la sincronización haya terminado.</p>
+          <div id="rename-note" class="info-note" hidden>El nombre cambiará en la carpeta de entrada. Los RAW y los paquetes completos se exportan como copia.</div>
+          <div class="destination-hint"><span>↳</span><span id="destination-hint">Selecciona un tipo para ver la ubicación recomendada.</span></div>
+        </section></div>
+    <div class="wizard-panel" data-step="4" hidden><section class="card"><h2>Comprueba los nombres y destinos</h2><p class="muted">Si algo no encaja, vuelve atrás para corregirlo. Las copias existentes nunca se sobrescriben.</p><div id="review-content"></div></section></div>
+    <div class="batch-footer"><div><strong id="selection-summary">Ningún archivo seleccionado</strong><span id="step-label">Paso 1 de 4</span></div><div class="wizard-navigation"><button id="previous-step" class="button" hidden>← Atrás</button><button id="next-step" class="button primary">Siguiente →</button><button id="preview" class="button" hidden>Actualizar revisión</button></div></div>
+  </section>
+<section id="view-library" class="view" hidden>
+  <div class="page-heading"><div><h1>Plantillas y favoritos</h1><p>Configura destinos y datos habituales para reutilizarlos en tus lotes.</p></div></div>
+  <section class="card"><h2>Destinos favoritos</h2><p>Carpetas disponibles al elegir el destino de un archivo.</p><button id="new-favorite" class="button primary-soft">+ Nuevo favorito</button><div id="favorites-list"></div></section>
+  <section class="card"><h2>Mis plantillas</h2><p>Combina un destino con el tipo de archivo, la técnica y una descripción habitual.</p><button id="new-template" class="button primary-soft">+ Nueva plantilla</button><div id="templates-list"></div></section>
+</section>
+<section id="view-history" class="view" hidden>
+    <div class="page-heading"><div><h1>Historial</h1><p>Consulta las operaciones, sus archivos y su resultado.</p></div></div>
+    <div class="card"><div class="history-toolbar"><input id="history-search" aria-label="Buscar en el historial" placeholder="Buscar nombre, ID o ruta…"><button id="refresh-history" class="button">Actualizar</button></div><div class="history-selection"><span id="history-selected">Ninguna entrada seleccionada</span><button id="delete-history" class="button danger" disabled>Borrar seleccionadas</button></div><div id="history-table"></div></div><p id="history-location" class="footnote"></p>
+  </section><section id="view-audit" class="view" hidden>
+    <div class="page-heading"><div><h1>Auditoría</h1><p>Revisa los nombres y la ubicación de los archivos para localizar inconsistencias.</p></div><button id="run-audit" class="button primary">Revisar Doctorado</button></div>
+    <div id="audit-results" class="card"><p>Revisa la estructura, IDs duplicados, nombres y ubicaciones. Los nombres internos de RAW se conservan.</p></div>
+  </section><section id="view-guide" class="view" hidden>
+  <div class="page-heading"><div><h1>Ayuda</h1><p>Usa el modo rápido para lo habitual y el formulario completo cuando necesites más detalle.</p></div></div>
+  <article class="card simple-guide"><h2>Modo rápido: tu recorrido habitual</h2><ol><li>En <strong>Plantillas y favoritos</strong>, crea una plantilla con carpeta, tipo, registro y técnica habituales. También puedes guardar solo una carpeta como favorito. Puedes editar o quitar estos accesos sin tocar los archivos.</li><li>En <strong>Nuevo lote</strong>, elige los archivos y pulsa Siguiente. Para cada uno, selecciona una plantilla o un favorito, escribe el ID y ajusta la descripción. Si la plantilla ya tiene descripción, puede bastar con el ID.</li><li>La fecha inicial es hoy; se muestra en la fila. Cambia fechas anteriores en <strong>Fecha y más opciones</strong>. Las plantillas no guardan ID ni fecha, ni confirman RAW automáticamente.</li><li>Pulsa <strong>Siguiente: revisar</strong>, comprueba nombres y rutas y exporta. Los originales se conservan y las colisiones bloquean la copia.</li></ol><p>Un favorito solo cambia la carpeta. Elegir una plantilla aplica sus datos al archivo elegido; revisa el ID que ya tuviera. Cambiar los datos de un archivo no modifica la plantilla guardada. Si prefieres escribir el nombre, despliega <strong>Escribir directamente el nombre completo</strong>: usa AAAA-MM-DD_ID_Descripcion sin extensión; ese nombre sustituye ID, fecha y descripción al exportar. Para otros casos puedes elegir <strong>Formulario completo</strong>.</p><h3>Formulario completo</h3>
+    <ol><li><strong>Archivos.</strong> Pon tus archivos en <code>D:\Doctorado\00_Entrada</code>, pulsa Revisar Entrada y marca los que quieras. También puedes elegir archivos de otra ubicación.</li>
+    <li><strong>Datos.</strong> Rellena directamente la fila de cada archivo: tipo, registro, ID, fecha y descripción. Los campos adicionales se despliegan en esa misma fila. La edición conjunta es opcional y solo se aplica a las filas y campos marcados.</li>
+    <li><strong>Destino.</strong> Haz clic en el campo de carpeta para elegir una existente. + Añadir carpeta permite escribir un nombre y crearla al momento. Solo las carpetas nuevas de esa sesión y vacías muestran la opción de eliminarse. Pulsa Siguiente para revisar los archivos.</li>
+    <li><strong>Revisar.</strong> Comprueba los nombres y las rutas completas. Corrige los avisos de error y pulsa Exportar lote.</li></ol>
+    <h3>¿Qué significa copiar una carpeta entera?</h3><p>Se copia la carpeta con todas sus subcarpetas y archivos como una unidad. No se renombran los archivos interiores. Úsalo para adquisiciones de equipos que necesitan varios archivos juntos. Para un PDF o un CSV suelto, usa Seleccionar archivos.</p>
+    <h3>Dos detalles útiles</h3><p><strong>Réplica:</strong> otra adquisición. <strong>Versión:</strong> otra edición del mismo documento o análisis. Usa 0 si no quieres ese sufijo.</p>
+    <p>Al exportar se conservan los originales. Para volver a procesarlos, elige otro nombre o destino si la salida ya existe. Si usas Drive, comprueba allí que haya terminado de sincronizar.</p>
+    <p>La auditoría es una revisión de solo lectura: señala nombres y ubicaciones a revisar. Cerrar la última pestaña apaga la app; si hay una copia en curso, primero termina.</p>
+    <details><summary>Guía original de referencia (la app también admite carpetas como DRX)</summary><pre id="original-convention"></pre></details>
+  </article>
+</section>
+  
+</main>
+
+<dialog id="modal"><div id="modal-content"></div></dialog>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<div id="busy" role="status" hidden><div class="spinner"></div><strong id="busy-text">Preparando…</strong><p>Espera a que termine esta operación.</p></div>
+</body>
+</html>

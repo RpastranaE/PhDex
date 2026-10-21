@@ -1,0 +1,122 @@
+DOCTORADO — GUÍA DE CARPETAS Y NOMBRES
+Versión: 2026-10-13
+Carpeta base: D:\Doctorado
+
+1. INSTALACIÓN
+Extrae los archivos de este paquete directamente en D:\Doctorado.
+Abre PowerShell y ejecuta:
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\Doctorado\Crear-Doctorado.ps1"
+No requiere ejecutarlo como administrador. La opción Bypass se aplica solo a
+ese proceso; no cambia permanentemente la configuración de PowerShell.
+El script crea carpetas vacías y plantillas. No borra ni mueve archivos, no
+sobrescribe documentos existentes y no modifica Notion ni Google Drive.
+Puedes volver a ejecutarlo para añadir lo que falte.
+
+2. REGLA PRINCIPAL
+Notion guarda el contexto, los estados y las relaciones. Estas carpetas guardan
+los archivos. Cada archivo de trabajo tiene una ubicación principal.
+Las carpetas se organizan por registro, no por duplicados dentro de cada
+proyecto: una muestra o un resultado puede relacionarse con varios proyectos.
+Crea una carpeta de registro solo cuando necesites almacenar archivos.
+No hacen falta carpetas para todas las tareas, ideas o artículos.
+
+3. CARPETAS PRINCIPALES
+00_Entrada: archivos recién recibidos pendientes de identificar. Clasifícalos.
+01_Proyectos: planificación, documentación e informes del proyecto.
+02_Experimentos: diseño, registro, datos producidos por el propio experimento
+y conclusiones. Los RAW de una caracterización se guardan en su CAR.
+03_Muestras: fotografías y documentación de la muestra; las mediciones en CAR.
+04_Caracterizaciones: RAW, exportaciones, procesamiento e informe del equipo.
+05_Resultados: análisis que sostienen un hallazgo, proyectos de Origin,
+figuras editables/exportadas, tablas e interpretación. También negativos.
+06_Ideas_Hipotesis: archivos de apoyo; conservar las hipótesis rechazadas.
+07_Literatura: notas o adjuntos de contexto. PDF y referencia principal en
+Zotero, sin copiar toda la biblioteca aquí.
+08_Tareas: adjuntos necesarios para una tarea.
+09_Reuniones: documentación y actas.
+10_Protocolos: documento y adjuntos de cada versión importante. Cada versión
+importante tiene su propia entrada PRO en Notion y su carpeta correspondiente.
+11_Publicaciones: manuscrito, paquete de entrega y revisiones. Las figuras
+maestras viven en RES; se permite una copia congelada en el paquete enviado.
+12_Tecnicas: manuales y requisitos de recepción; no datos de mediciones.
+13_Solicitudes_LIMS: un registro y carpeta por solicitud/equipo. El PDF se
+guarda una vez y se relaciona en Notion con las muestras y CAR correspondientes.
+14_Tesis: capítulos, compilación, entrega y defensa.
+90_Plantillas: modelos vacíos para copiar cuando haga falta un registro.
+99_Gestion: exportaciones de Notion y documentación administrativa.
+
+4. NOMBRES DE CARPETAS
+Formato: ID__Descripcion_breve
+Ejemplos ficticios (no se crean como registros):
+EXP-12__Sintesis_lote_B
+MUE-8__Lote_B
+CAR-27__MUE-8_FTIR-ATR
+RES-6__Cambio_banda_carbonilo
+Usa el ID real de Notion. No generes ni reinicies IDs con las carpetas.
+Escribe los IDs sin ceros añadidos; si Notion muestra EXP-12, usa EXP-12.
+Mantén estable el ID aunque cambie la descripción.
+LIMS: usa el ID real si existe en Notion. Si no hay ID nativo, usa el número
+oficial de solicitud: LIMS-2026-1234__ICP-MS. Es solo un ejemplo de formato.
+
+5. NOMBRES DE ARCHIVOS
+Formato: AAAA-MM-DD_ID[_MUE-ID][_Tecnica]_Contenido[_rNN][_vNN].ext
+Fecha: adquisición para datos; emisión para justificantes; creación para textos.
+ID: registro al que pertenece el archivo. Muestra y técnica solo si ayudan.
+r01, r02: réplicas/adquisiciones distintas. v01, v02: versiones de un análisis
+ o documento. No uses v02 para una réplica experimental.
+Ejemplos ficticios:
+2026-10-20_EXP-12_Registro_v01.docx
+2026-10-21_CAR-27_MUE-8_FTIR-ATR_Espectro_r01.csv
+2026-10-22_RES-6_Ajuste_bandas_v02.opju
+2026-10-22_RES-6_Figura_espectros_v02.svg
+2026-10-22_RES-6_Figura_espectros_v02.png
+2026-10-21_LIMS-2026-1234_ICP-MS_Justificante.pdf
+2026-10-23_REU-4_Acta_v01.docx
+Usa guiones en IDs y guiones bajos entre campos. Nombres breves, sin tildes
+ni caracteres \ / : * ? " < > |. Conserva la extensión original.
+Evita nombres como final_final o copia_nueva; incrementa v01, v02, v03.
+
+6. DATOS RAW Y ORIGIN
+Copia los datos originales completos en CAR\01_RAW. Conserva los nombres y
+la estructura que genera el instrumento: algunos formatos dependen de sus
+carpetas y archivos auxiliares. No renombres ni edites esos originales para
+cumplir la regla de nombres; usa el nombre de la carpeta CAR para identificarlos.
+Para trabajar, exporta a 02_Exportaciones o guarda derivados en 03_Procesamiento.
+Cuando el análisis sustente un resultado, guarda su proyecto de Origin en
+RES\02_Origin y sus figuras/tablas en las subcarpetas de RES.
+Si el procesamiento ya existe en CAR, enlázalo desde RES en lugar de copiarlo.
+Si cambias un ajuste relevante, conserva una versión anterior del proyecto.
+Conserva datos fallidos, resultados negativos y explicaciones de exclusiones.
+
+7. RELACIÓN CON NOTION
+Cada plantilla/registro incluye REFERENCIAS.txt. Completa la URL de su página
+Notion y los IDs relacionados. Las relaciones oficiales siguen en Notion.
+En Ruta de datos guarda la ruta de esa carpeta; por ejemplo:
+D:\Doctorado\04_Caracterizaciones\CAR-27__MUE-8_FTIR-ATR
+Si tienes el enlace web de Drive, guárdalo también en el campo existente adecuado.
+Una ruta local escrita en Notion sirve de referencia: no implica que Notion
+pueda abrirla en cualquier dispositivo. Drive e institución pueden usar rutas
+distintas: anota ambas cuando corresponda.
+En un resultado, registra las CAR que lo sustentan y enlaza sus datos.
+Los registros de muestra permiten navegar por sus CAR, RES y solicitudes LIMS.
+
+8. USO DEL SCRIPT PARA UN NUEVO REGISTRO
+Primero crea la entrada en Notion y copia su ID. Después, por ejemplo:
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\Doctorado\Crear-Doctorado.ps1" -Tipo Caracterizacion -Id CAR-27 -Nombre MUE-8_FTIR-ATR
+O para un resultado:
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\Doctorado\Crear-Doctorado.ps1" -Tipo Resultado -Id RES-6 -Nombre Cambio_banda_carbonilo
+Tipos admitidos: Proyecto, Experimento, Muestra, Caracterizacion, Resultado,
+Idea, Articulo, Tarea, Reunion, Protocolo, Publicacion, Tecnica, LIMS.
+También puedes copiar la plantilla correspondiente de 90_Plantillas,
+renombrarla con el ID real y moverla a la carpeta principal correspondiente.
+No guardes datos reales dentro de 90_Plantillas.
+
+9. ESPACIO Y CONSERVACIÓN
+La estructura no cambia qué carpetas sincroniza Drive. Si Doctorado se
+sincroniza íntegramente, los RAW que añadas pueden consumir cuota en la nube.
+Los archivos grandes pueden conservarse en almacenamiento institucional o en
+una ubicación local fuera de la carpeta sincronizada: guarda aquí y en Notion
+su ruta real. No muevas automáticamente datos que ya estén referenciados.
+La sincronización no sustituye una copia de seguridad independiente.
+Exporta Notion periódicamente a 99_Gestion\Exportaciones_Notion; revisa también
+las copias de los archivos y del almacenamiento institucional.
