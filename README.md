@@ -85,3 +85,7 @@ El resultado es `dist/PhDex.exe`, con el icono y los recursos incluidos. La prue
 Se incluye el recurso de política de certificados que requiere el Python usado para empaquetar el EXE, corrigiendo la conexión a GitHub sin desactivar HTTPS ni su validación. La prueba smoke_github.py verifica la consulta real desde el ejecutable. El icono de Actualizaciones se sustituye por una flecha de descarga.
 
 Cada regla admite hasta 20 condiciones: Contiene, No contiene, Extensión, Empieza por y Termina en. + Añadir condición agrega otra fila; Todas exige todas las condiciones y Cualquiera acepta una alternativa. Por ejemplo, DRX Y extensión csv; o DRX O XRD. Son textos literales, no expresiones regulares ni búsquedas en el contenido. Las reglas anteriores siguen funcionando y se pueden editar.
+
+## Corrección 2.1.2
+
+El formulario de reglas mantiene Guardar y Cancelar visibles al tamaño normal del navegador. Solo se desplaza su contenido; se ha comprobado con 20 condiciones y ventanas de 600 y 500 píxeles de alto. El mismo ajuste se aplica a los formularios de los diálogos.

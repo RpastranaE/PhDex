@@ -15,7 +15,7 @@ import uuid
 from core import UserError
 from workflow import safe_path
 
-VERSION = '2.1.1'
+VERSION = '2.1.2'
 REPOSITORY = 'RpastranaE/PhDex'
 RELEASES_URL = 'https://github.com/'+REPOSITORY+'/releases'
 API = 'https://api.github.com/repos/'+REPOSITORY

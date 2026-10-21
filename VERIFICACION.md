@@ -66,3 +66,7 @@ Actualizador: comparación de versiones sin regresiones, rechazo de publicacione
 ## Versión 2.1.1
 
 75 pruebas Python y 5 JavaScript correctas. Nuevas regresiones: recurso TLS del runtime incluido al compilar, clasificación de errores de certificados/recursos/red, combinación Y/O de condiciones, validación de límites y persistencia sin modificar reglas ante errores. Se prueba la conexión HTTPS real a GitHub desde el EXE, además de copias, colisiones, respaldo y reinicio del actualizador.
+
+## Versión 2.1.2
+
+Corrección de altura del formulario de reglas: cabecera y botones fuera del área desplazable. Comprobación visual a 1280×600 y 800×500 con 20 condiciones: Guardar permanece dentro de la ventana. Cancelar descarta las modificaciones de prueba. Se mantienen las pruebas del ejecutable y del actualizador.
