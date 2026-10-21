@@ -4,12 +4,17 @@ Gestor de archivos de investigación para Windows. Permite seleccionar un lote d
 
 ## Descargar y abrir
 
-1. En este repositorio privado, elige **Code → Download ZIP** y extrae el contenido en una carpeta propia (por ejemplo `D:\Gestor de archivos`).
-2. Necesitas Python 3.12 o posterior. La aplicación utiliza la biblioteca estándar: no necesita instalar paquetes para funcionar.
-3. Abre **Abrir PhDex.cmd**. Si Python no está disponible, el acceso indicará cómo instalarlo.
-4. La carpeta de trabajo predeterminada es `D:\Doctorado`. Para usar otra, ejecuta `python app.py --doctorado "C:\Mi carpeta"`.
+1. Abre **Releases** en este repositorio privado y descarga **PhDex.exe** de la última versión (o el ZIP portátil).
+2. Guarda el ejecutable en una carpeta propia y haz doble clic. Lleva Python y los recursos incluidos: no necesitas instalar Python ni ejecutar un CMD.
+3. La interfaz se abre en el navegador. Al cerrar la última pestaña, PhDex termina cuando acaba cualquier copia pendiente.
 
-La guía detallada se encuentra en **GUIA_RAPIDA.html** y en **Ayuda** dentro de la aplicación.
+La carpeta de trabajo predeterminada es `D:\Doctorado`. Para otra ubicación: `PhDex.exe --doctorado "C:\Mi carpeta"`.
+
+El historial, plantillas, favoritos y preferencias se guardan en **Documentos\PhDex\datos_app**, en el perfil de Windows donde se ejecuta. Se respeta la ubicación de Documentos configurada en Windows, incluso si está redirigida a OneDrive. Puedes mover o actualizar el ejecutable sin mover estos datos.
+
+En la primera apertura, si no hay datos en Documentos y existe un `datos_app` junto al ejecutable, se copia el historial y la configuración de esa instalación. La copia anterior se conserva. Si ya hay datos en Documentos, no se sustituyen ni se mezclan automáticamente.
+
+La guía está en **GUIA_RAPIDA.html** y en **Ayuda** dentro de la aplicación. El código fuente se puede descargar desde Code → Download ZIP; para ejecutarlo como código fuente sí necesitas Python 3.12 o posterior.
 
 ## Uso habitual
 
@@ -29,7 +34,7 @@ Los archivos **PhDex.png** y **PhDex.ico** están en la raíz. El ICO incluye ta
 
 Código, pruebas, guía, referencia de nombres e iconos. **No incluye** archivos del doctorado, historial SQLite, preferencias personales, favoritos o plantillas guardadas, catálogos ni credenciales. Estos datos permanecen en el ordenador y necesitan su propia copia de seguridad.
 
-Al descargar en un equipo nuevo se crea una biblioteca vacía. Al actualizar una instalación existente, conserva `datos_app/` y haz antes una copia de la instalación completa. No extraigas una versión sobre archivos de investigación.
+Al ejecutar en un equipo nuevo se crea una biblioteca vacía en Documentos. Guarda una copia de Documentos\PhDex para recuperar tu configuración personal; GitHub contiene la aplicación, no estos datos. No extraigas versiones sobre archivos de investigación.
 
 ## Pruebas
 
@@ -45,3 +50,14 @@ Node se utiliza únicamente para comprobar JavaScript, no para ejecutar la aplic
 
 Repositorio de referencia: https://github.com/RpastranaE/PhDex (privado).
 Las futuras mejoras deben publicarse aquí después de verificarlas. Esto es una instrucción de mantenimiento; la aplicación no vigila cambios ni sube datos automáticamente.
+
+
+## Compilar el ejecutable (Windows x64)
+
+```text
+python -m pip install -r requirements-build.txt
+python build_exe.py
+python smoke_exe.py dist/PhDex.exe
+```
+
+El resultado es `dist/PhDex.exe`, con el icono y los recursos incluidos. La prueba del ejecutable utiliza datos ficticios y una carpeta temporal. La compilación automática también está disponible en GitHub Actions. El ejecutable se distribuye sin firma digital.

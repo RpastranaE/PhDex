@@ -68,3 +68,7 @@ Versión 1.7: modo rápido de tres pasos y página Plantillas y favoritos. La bi
 
 
 Versión 1.8: identidad PhDex, navegación con iconos SVG, diseño neutro y formularios con ayuda contextual. Acceso Abrir PhDex.cmd; se conserva el acceso anterior.
+
+
+## Versión 2.0: ejecutable
+Abre PhDex.exe. Incluye el intérprete y los recursos, y utiliza la interfaz en el navegador. El historial, preferencias y biblioteca se guardan en Documentos/PhDex/datos_app. El primer arranque copia los datos antiguos adyacentes solo si el destino no existe; nunca borra ni sobrescribe el historial previo. Los accesos CMD antiguos utilizan el EXE cuando está presente. Consulta README.md para descargar y compilar.

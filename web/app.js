@@ -347,7 +347,7 @@ async function init() {
     $('category').value='export';$('file-date').value=today();$('output-path').value='';
     await loadLibrary();updateOwner();updateCategory(false);updateMode();bind();bindQuick();setStep(1);
     try{const structure=await api('/api/structure');$('inbox').innerHTML=structure.inboxes.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');$('open-inbox').disabled=!structure.inboxes.length;if(!$('input-path').value.trim())$('input-path').value=structure.inboxes[0]||'';$('drive-note').textContent='Si utilizas Drive, espera a que termine la sincronización antes de abrir el archivo en otro equipo.';}catch(e){$('open-inbox').disabled=true;toast(e.message,true);}
-  }catch(error){toast(error.message,true);$('empty-files').innerHTML='<h3>No se pudo iniciar PhDex</h3><p>Abre la app desde <strong>Abrir PhDex.cmd</strong> y utiliza la nueva pestaña que se abra.</p>';}
+  }catch(error){toast(error.message,true);$('empty-files').innerHTML='<h3>No se pudo iniciar PhDex</h3><p>Abre la app desde <strong>PhDex.exe</strong> y utiliza la nueva pestaña que se abra.</p>';}
 }
 
 async function loadLibrary(){library=await api('/api/library');renderLibrary();}

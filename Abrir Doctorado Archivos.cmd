@@ -1,5 +1,9 @@
 @echo off
 setlocal
+if exist "%~dp0PhDex.exe" (
+    start "" "%~dp0PhDex.exe"
+    exit /b
+)
 cd /d "%~dp0"
 set "DOCTORADO_PY=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\pythonw.exe"
 if exist "%DOCTORADO_PY%" (

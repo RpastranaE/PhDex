@@ -12,3 +12,8 @@ qa_*/
 Prueba*.png
 .DS_Store
 Thumbs.db
+
+build/
+dist/
+*.spec
+.build_tools/

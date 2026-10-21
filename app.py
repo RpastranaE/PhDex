@@ -21,6 +21,7 @@ from core import CATEGORIES, Engine, UserError, metadata, absolute
 from workflow import structure, recommend, audit, safe_path, ROOTS
 from folders import SessionFolders
 from library import Library
+from storage import default_data_dir, migrate_legacy_data
 
 ROOT = Path(__file__).resolve().parent
 
@@ -171,7 +172,7 @@ class LocalApp:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "PhDex/1.9"
+    server_version = "PhDex/2.0"
 
     @property
     def app(self):
@@ -347,13 +348,18 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Doctorado · Archivos, aplicación local")
+    parser = argparse.ArgumentParser(description="PhDex — Gestión de archivos")
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--no-browser", action="store_true")
-    parser.add_argument("--data-dir", type=Path, default=ROOT / "datos_app")
+    parser.add_argument("--data-dir", type=Path)
+    parser.add_argument("--connection-file", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--doctorado", type=Path, default=Path('D:/Doctorado'))
     args = parser.parse_args()
-    app = LocalApp(args.data_dir.resolve(), args.doctorado.resolve())
+    data_dir = args.data_dir.resolve() if args.data_dir else default_data_dir()
+    if args.data_dir is None:
+        legacy_root = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else ROOT
+        migrate_legacy_data(data_dir, legacy_root/'datos_app')
+    app = LocalApp(data_dir, args.doctorado.resolve())
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     server.app = app
     app.server = server
@@ -365,6 +371,11 @@ def main():
     if not args.no_browser:
         webbrowser.open(url)
     try:
+        if args.connection_file:
+            # Explicit diagnostic output for the packaged smoke test only.
+            # Never overwrite existing files, never create this in normal use.
+            with args.connection_file.open('x', encoding='utf-8') as stream:
+                json.dump({'url': url, 'port': server.server_port, 'key': app.key}, stream)
         server.serve_forever()
     except KeyboardInterrupt:
         pass
@@ -377,8 +388,14 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        error_dir = ROOT / "datos_app"
-        error_dir.mkdir(exist_ok=True)
-        (error_dir / "error_inicio.txt").write_text(traceback.format_exc(), encoding="utf-8")
+        error_dir = default_data_dir().parent
+        error_dir.mkdir(parents=True, exist_ok=True)
+        error_path = error_dir / "error_inicio.txt"
+        error_path.write_text(traceback.format_exc(), encoding="utf-8")
         if sys.stderr:
             traceback.print_exc()
+        if getattr(sys, 'frozen', False) and '--no-browser' not in sys.argv:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None,
+                'No se ha podido abrir PhDex. Consulta el detalle en:\n'+str(error_path), 'PhDex', 0x10)
+        raise SystemExit(1)

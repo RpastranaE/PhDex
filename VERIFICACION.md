@@ -52,3 +52,7 @@ Prueba de interfaz: se añadieron cuatro archivos ficticios simultáneamente. Se
 
 ## PhDex (1.8)
 Renovación visual y de textos. Sin cambios en el motor de copia ni en la biblioteca guardada. Revisión de formulario de plantillas, navegación y lote rápido en navegador.
+
+
+## PhDex 2.0: EXE y Documentos
+61 pruebas Python y 5 JavaScript. Ejecutable Windows x64 con icono y versión integrados, sin consola. Prueba real del EXE con Python externo no configurado: recursos web, SQLite, biblioteca, copia, colisión, borrado confirmado y reinicio persistente. Datos predeterminados en Documentos/PhDex/datos_app; migración SQLite consistente y sin sobrescribir destinos existentes.
