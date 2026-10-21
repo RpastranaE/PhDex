@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+import ssl
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler
@@ -14,7 +15,7 @@ import uuid
 from core import UserError
 from workflow import safe_path
 
-VERSION = '2.1.0'
+VERSION = '2.1.1'
 REPOSITORY = 'RpastranaE/PhDex'
 RELEASES_URL = 'https://github.com/'+REPOSITORY+'/releases'
 API = 'https://api.github.com/repos/'+REPOSITORY
@@ -48,7 +49,12 @@ def request_github(url, accept='application/vnd.github+json'):
         if error.code in (403,429):raise UserError('GitHub ha limitado temporalmente las consultas. Inténtalo más tarde.') from None
         if error.code==404:raise UserError('No hay una versión pública disponible en GitHub.') from None
         raise UserError('GitHub no ha podido completar la consulta (HTTP '+str(error.code)+').') from None
-    except (URLError,TimeoutError,OSError):
+    except (URLError,TimeoutError,OSError) as error:
+        reason=getattr(error,'reason',error)
+        if isinstance(reason,ssl.SSLCertVerificationError):
+            raise UserError('No se ha podido validar el certificado HTTPS de GitHub. Comprueba la fecha de Windows y la conexión de red.') from None
+        if isinstance(reason,FileNotFoundError):
+            raise UserError('Falta un recurso de la conexión HTTPS. Descarga la última versión de PhDex desde GitHub.') from None
         raise UserError('No se ha podido conectar con GitHub. Comprueba tu conexión; puedes seguir usando PhDex.') from None
 
 

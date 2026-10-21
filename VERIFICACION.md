@@ -62,3 +62,7 @@ Renovación visual y de textos. Sin cambios en el motor de copia ni en la biblio
 71 pruebas Python y 5 JavaScript: reconocimiento conservador y ambigüedades, reglas múltiples y referencias a plantillas eliminadas, carpeta de entrada configurable, importación interrumpida/sin sobrescrituras/nombres inválidos, pendientes modificados o con salida ausente, vista de nombres y apertura restringida a destinos registrados. Prueba del ejecutable con estado temporal, copias, colisiones, pendientes y reinicio. Prueba visual del recorrido con datos sintéticos, sugerencias, vista previa e importación desde navegador. Sin exportaciones ni borrados sobre archivos reales.
 
 Actualizador: comparación de versiones sin regresiones, rechazo de publicaciones preliminares o assets ajenos, descargas truncadas y tamaño/formato inválidos, limitación a HTTPS GitHub, bloqueo con copias en curso o varias pestañas, preferencias persistentes y prueba del ayudante integrado con respaldo, reemplazo y reinicio sobre una instalación aislada. No requiere PowerShell ni altera políticas de Windows.
+
+## Versión 2.1.1
+
+75 pruebas Python y 5 JavaScript correctas. Nuevas regresiones: recurso TLS del runtime incluido al compilar, clasificación de errores de certificados/recursos/red, combinación Y/O de condiciones, validación de límites y persistencia sin modificar reglas ante errores. Se prueba la conexión HTTPS real a GitHub desde el EXE, además de copias, colisiones, respaldo y reinicio del actualizador.

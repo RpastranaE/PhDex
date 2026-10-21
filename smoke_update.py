@@ -2,7 +2,7 @@
 from pathlib import Path
 import json,os,shutil,subprocess,sys,tempfile,time
 from urllib.request import Request,urlopen
-from updater import launch_replacement
+from updater import launch_replacement, VERSION
 from unittest.mock import patch
 
 
@@ -38,7 +38,7 @@ def check_update(executable):
             request(old_info,'/api/shutdown',{})
             original.wait(timeout=30)
             new_info=ready(second)
-            assert request(new_info,'/api/version')['version']=='2.1.0'
+            assert request(new_info,'/api/version')['version']==VERSION
             assert request(new_info,'/api/version')['automatic'] is False
             assert marker.read_text(encoding='utf-8')=='conservar'
             backups=list(root.glob('PhDex.exe.respaldo-*.exe'));assert len(backups)==1

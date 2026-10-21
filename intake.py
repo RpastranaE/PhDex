@@ -10,6 +10,25 @@ from core import UserError, extension, KINDS, fingerprint, Engine
 from workflow import safe_path, FILE
 
 
+MATCHES=('contains','not_contains','extension','starts_with','ends_with')
+
+
+def rule_conditions(rule):
+    return rule.get('conditions',[{'match':rule.get('match'),'pattern':rule.get('pattern','')}])
+
+
+def rule_matches(rule,name):
+    name=name.casefold()
+    results=[]
+    for condition in rule_conditions(rule):
+        pattern=condition['pattern'].casefold()
+        kind=condition['match']
+        results.append({'contains':lambda:pattern in name,'not_contains':lambda:pattern not in name,
+                        'extension':lambda:name.endswith('.'+pattern.lstrip('.')),
+                        'starts_with':lambda:name.startswith(pattern),'ends_with':lambda:name.endswith(pattern)}[kind]())
+    return bool(results) and (any(results) if rule.get('combine','all')=='any' else all(results))
+
+
 def recognize(name):
     stem = name[:-len(extension(Path(name)))] if extension(Path(name)) else name
     result, notes = {}, []
@@ -85,14 +104,24 @@ class Intake:
                     data['rules'].remove(old)
                 else:
                     value = request.get('value', {})
-                    label, pattern = str(value.get('label','')).strip(), str(value.get('pattern','')).strip()
-                    if not label or len(label)>80 or not pattern or len(pattern)>120 or value.get('match') not in ('contains','extension'):
-                        raise UserError('Completa el nombre y el criterio de la regla (texto o extensión).')
-                    if value['match']=='extension' and not re.fullmatch(r'\.?[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*', pattern):
-                        raise UserError('Extensión no válida. Ejemplo: csv o csv.gz.')
+                    label = str(value.get('label','')).strip()
+                    conditions=rule_conditions(value)
+                    combine=value.get('combine','all')
+                    if not label or len(label)>80 or combine not in ('all','any') or not isinstance(conditions,list) or not 1<=len(conditions)<=20:
+                        raise UserError('Completa el nombre y añade entre 1 y 20 condiciones. Elige Todas o Cualquiera.')
+                    cleaned=[]
+                    for condition in conditions:
+                        if not isinstance(condition,dict):raise UserError('Condición no válida.')
+                        pattern=str(condition.get('pattern','')).strip()
+                        kind=condition.get('match')
+                        if not pattern or len(pattern)>120 or kind not in MATCHES:
+                            raise UserError('Completa el tipo y el texto de cada condición (hasta 120 caracteres).')
+                        if kind=='extension' and not re.fullmatch(r'\.?[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*',pattern):
+                            raise UserError('Extensión no válida. Ejemplo: csv o csv.gz.')
+                        cleaned.append({'match':kind,'pattern':pattern})
                     if not any(t['id']==value.get('template') for t in self.library.read()['templates']):
                         raise UserError('Elige una plantilla existente.')
-                    row = {'id':record_id or uuid.uuid4().hex,'label':label,'pattern':pattern,'match':value['match'],'template':value['template']}
+                    row = {'id':record_id or uuid.uuid4().hex,'label':label,'conditions':cleaned,'combine':combine,'template':value['template']}
                     if old: data['rules'][data['rules'].index(old)] = row
                     else:
                         if len(data['rules'])>=100: raise UserError('Límite de 100 reglas.')
@@ -112,9 +141,7 @@ class Intake:
         templates = {t['id']:t for t in self.library.read()['templates']}
         matches = []
         for rule in self.read()['rules']:
-            pattern = rule['pattern'].casefold()
-            match = (pattern in name.casefold()) if rule['match']=='contains' else name.casefold().endswith('.'+pattern.lstrip('.'))
-            if match and rule['template'] in templates:
+            if rule_matches(rule,name) and rule['template'] in templates:
                 matches.append({'rule':rule['label'], 'template':templates[rule['template']]})
         result['matches'] = matches
         return result

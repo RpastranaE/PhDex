@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from app import LocalApp, Handler, ThreadingHTTPServer
-from intake import recognize
+from intake import recognize,rule_matches
 from core import UserError
 
 
@@ -25,6 +25,29 @@ class IntakeTests(unittest.TestCase):
         self.service=self.app.intake
 
     def tearDown(self):self.temp.cleanup()
+
+    def test_multiple_conditions_all_any_and_legacy(self):
+        rule={'combine':'all','conditions':[{'match':'contains','pattern':'DRX'},{'match':'extension','pattern':'csv'}]}
+        self.assertTrue(rule_matches(rule,'CAR-27_drx.csv'))
+        self.assertFalse(rule_matches(rule,'DRX.xlsx'))
+        self.assertFalse(rule_matches(rule,'FTIR.csv'))
+        rule['combine']='any'
+        self.assertTrue(rule_matches(rule,'DRX.xlsx'))
+        self.assertTrue(rule_matches(rule,'FTIR.csv'))
+        self.assertFalse(rule_matches(rule,'FTIR.xlsx'))
+        self.assertTrue(rule_matches({'match':'contains','pattern':'drx'},'DRX.csv'))
+        self.assertTrue(rule_matches({'conditions':[{'match':'starts_with','pattern':'CAR-'},{'match':'ends_with','pattern':'_RAW.csv'},{'match':'not_contains','pattern':'descartar'}]},'CAR-27_DRX_RAW.csv'))
+
+    def test_multiple_conditions_validation_and_persistence(self):
+        t=self.app.library.change({'revision':0,'group':'templates','value':{'label':'DRX','output':str(self.output),'meta':{'category':'export','owner_kind':'characterization'}}})['templates'][0]
+        value={'label':'DRX CSV','combine':'all','conditions':[{'match':'contains','pattern':'DRX'},{'match':'extension','pattern':'.csv'}],'template':t['id']}
+        saved=self.service.change({'revision':0,'value':value})
+        self.assertEqual(saved['rules'][0]['conditions'],value['conditions'])
+        self.assertEqual(len(self.service.suggestions('drx.csv')['matches']),1)
+        self.assertEqual(self.service.suggestions('drx.xlsx')['matches'],[])
+        for override in ({'conditions':[]},{'conditions':[{'match':'unknown','pattern':'x'}]},{'combine':'invalid'},{'conditions':[{'match':'contains','pattern':''}]},{'conditions':[{'match':'contains','pattern':'x'}]*21}):
+            with self.assertRaises(UserError):self.service.change({'revision':1,'value':{**value,**override}})
+        self.assertEqual(self.service.read(),saved)
 
     def test_recognition_ambiguity_dates_and_complete_name(self):
         result=recognize('DRX CAR-27 2026-10-21.csv')['meta']

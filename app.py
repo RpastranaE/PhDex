@@ -205,7 +205,7 @@ class LocalApp:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "PhDex/2.1"
+    server_version = "PhDex/2.1.1"
 
     @property
     def app(self):

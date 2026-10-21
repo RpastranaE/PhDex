@@ -1,4 +1,6 @@
 import io,json
+import ssl
+from urllib.error import URLError
 from pathlib import Path
 import sys,tempfile,unittest
 from unittest.mock import patch
@@ -6,6 +8,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from core import UserError
 from updater import Updater,release_info,version_tuple,github_url,REPOSITORY
 from app import LocalApp
+from updater import request_github
 
 
 def release(tag='v2.1.0',size=2048):
@@ -13,6 +16,21 @@ def release(tag='v2.1.0',size=2048):
 
 
 class UpdateTests(unittest.TestCase):
+    def test_network_errors_distinguish_missing_resources_and_certificates(self):
+        for reason,message in ((FileNotFoundError('missing'),'recurso'),(ssl.SSLCertVerificationError('invalid'),'certificado'),(OSError('offline'),'conectar')):
+            with patch('updater.build_opener') as opener:
+                opener.return_value.open.side_effect=URLError(reason)
+                with self.assertRaisesRegex(UserError,message):request_github('https://api.github.com/repos/RpastranaE/PhDex/releases/latest')
+
+    def test_build_preserves_runtime_tls_resource(self):
+        import build_exe
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);policy=folder/'codex-rejected-cas.pem';policy.write_text('synthetic fixture')
+            with patch('ssl.__file__',str(folder/'ssl.py')),patch('build_exe.subprocess.run') as run:
+                build_exe.main()
+            command=run.call_args.args[0]
+            self.assertIn(str(policy)+__import__('os').pathsep+'.',command)
+            self.assertEqual(command[-1],str(build_exe.ROOT/'app.py'))
     def test_release_version_comparison_no_downgrade_and_invalid_payloads(self):
         self.assertTrue(release_info(release(),'2.0.0')['available'])
         self.assertFalse(release_info(release(),'2.1.0')['available'])

@@ -29,7 +29,7 @@ El buscador de **Historial** filtra nombres, IDs, descripciones y rutas mientras
 - La carpeta de entrada se detecta al iniciar y se cambia con **Cambiar**. Se guarda por usuario en Documentos/PhDex/datos_app/entrada_reglas.json. No se crea ni reorganiza ninguna carpeta existente.
 - Arrastra archivos al primer paso, o pulsa en esa zona para importarlos. Se copian a Entrada sin sobrescribir (hasta 2 GB por archivo). Si ya están en Entrada, usa **Revisar entrada**. El selector de otra ubicación permite añadir una ruta directamente. Las carpetas/adquisiciones con auxiliares se seleccionan completas.
 - El reconocimiento usa solo el nombre: fechas AAAA-MM-DD, un ID sin ambigüedad y técnicas habituales (DRX/XRD, FTIR/ATR, Raman, SEM/TEM, DSC/TGA, UV-Vis, RMN). No lee contenido, no inventa IDs. Acepta o descarta las sugerencias. Un nombre completo válido se mantiene mediante Nombre manual; vacíalo para reconstruirlo con los campos.
-- Crea reglas en **Reglas de clasificación**: texto literal contenido o extensión, asociados a una plantilla. Las coincidencias múltiples requieren elección. Datos reconocidos del nombre prevalecen sobre la plantilla. Las reglas se evalúan al añadir nuevos archivos.
+- Crea reglas en **Reglas de clasificación**: hasta 20 condiciones de texto, extensión, inicio o final del nombre, asociadas a una plantilla; elige Todas (Y) o Cualquiera (O). Las coincidencias múltiples requieren elección. Datos reconocidos del nombre prevalecen sobre la plantilla. Las reglas se evalúan al añadir nuevos archivos.
 - La ficha muestra el nombre resultante mientras editas. La revisión final comprueba además destinos y colisiones.
 - **Revisar entrada** muestra pendientes y permite incluir exportados. El estado usa historial, tamaño y fechas, con salida todavía existente; no verifica contenido. Si se borra historial, se pierde esa referencia.
 - Al acabar, marca uno o varios destinos y pulsa **Abrir seleccionados** (hasta 20 por pulsación). No se abren automáticamente.
@@ -79,3 +79,9 @@ python smoke_exe.py dist/PhDex.exe
 ```
 
 El resultado es `dist/PhDex.exe`, con el icono y los recursos incluidos. La prueba del ejecutable utiliza datos ficticios y una carpeta temporal. La compilación automática también está disponible en GitHub Actions. El ejecutable se distribuye sin firma digital.
+
+## Correcciones 2.1.1
+
+Se incluye el recurso de política de certificados que requiere el Python usado para empaquetar el EXE, corrigiendo la conexión a GitHub sin desactivar HTTPS ni su validación. La prueba smoke_github.py verifica la consulta real desde el ejecutable. El icono de Actualizaciones se sustituye por una flecha de descarga.
+
+Cada regla admite hasta 20 condiciones: Contiene, No contiene, Extensión, Empieza por y Termina en. + Añadir condición agrega otra fila; Todas exige todas las condiciones y Cualquiera acepta una alternativa. Por ejemplo, DRX Y extensión csv; o DRX O XRD. Son textos literales, no expresiones regulares ni búsquedas en el contenido. Las reglas anteriores siguen funcionando y se pueden editar.
