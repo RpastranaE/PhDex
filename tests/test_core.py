@@ -64,7 +64,7 @@ class FileWorkflowTests(unittest.TestCase):
         self.assertEqual(result["manifest"], "")
         self.assertEqual(len(list(self.output.iterdir())), 1)
         log = self.engine.history()[0]
-        self.assertEqual(log["source"], str(p))
+        self.assertEqual(log["source"], str(p.resolve()))
         self.assertEqual(log["destination"], str(target))
         self.assertEqual(log["notion_url"], "")
         exported = list(csv.DictReader(io.StringIO(self.engine.csv_text().lstrip("\ufeff")), delimiter=";"))
