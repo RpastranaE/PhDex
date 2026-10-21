@@ -17,7 +17,7 @@ async function keepSessionOpen() {
   } catch(error) {
     if(controller.signal.aborted)return;
   }
-  if(!controller.signal.aborted)toast('La sesión se ha cerrado. Abre la app desde su acceso para continuar.',true);
+  if(!controller.signal.aborted&&!updatesRestarting)toast('La sesión se ha cerrado. Abre la app desde su acceso para continuar.',true);
 }
 window.addEventListener('pagehide',()=>lifecycleController?.abort());
 window.addEventListener('pageshow',event=>{if(event.persisted)keepSessionOpen();});
@@ -37,7 +37,7 @@ function bytes(value) { if(value==null)return 'Carpeta'; if(value<1024)return va
 function today() {const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
 function getMeta() {const m={};for(const [field,id]of Object.entries(metaFields))m[field]=$(id).value;m.replicate=Number(m.replicate||0);m.version=m.category.startsWith('raw_')?0:Number(m.version||0);m.independent_raw=$('raw-confirm').checked;return m;}
 function fillMeta(m) {for(const [field,id]of Object.entries(metaFields)){if(m[field]!==undefined)$(id).value=Array.isArray(m[field])?m[field].join(', '):m[field];}$('raw-confirm').checked=Boolean(m.independent_raw);updateCategory(false);updateOwner(false);}
-function invalidate() {plan=null;if($('review-content'))$('review-content').innerHTML='Vuelve al paso anterior y actualiza la revisión.';}
+function invalidate() {queueLiveNames();plan=null;if($('review-content'))$('review-content').innerHTML='Vuelve al paso anterior y actualiza la revisión.';}
 function itemMeta(item) {if(!item.override)item.override=MetadataModel.fresh(today());return item.override;}
 async function runAudit() {
   busy('Revisando estructura y nombres, sin modificar archivos…');const r=await api('/api/audit',{});unbusy();
@@ -64,6 +64,7 @@ function updateOwner() {
 
 async function addPaths(paths) {
   if(!paths.length)return;
+  if(items.length+paths.length>500)throw new Error('Límite de 500 entradas por lote.');
   busy('Leyendo los archivos de entrada…');
   const data=await api('/api/inspect',{paths});
   for(const item of data.items){if(!items.some(x=>x.path.toLowerCase()===item.path.toLowerCase()))items.push({...item,selected:true,override:MetadataModel.fresh(today()),bulkSelected:false,recordDescription:''});}
@@ -118,12 +119,14 @@ function rowSelect(item,field,label,options) {
 }
 function clearSuggestedRoute(item) {if(item.routeMeta){item.output='';item.routeMeta=null;item.folderState=null;}}
 function renderMetadataEditors() {
+  $('accept-all-suggestions').hidden=!items.some(i=>i.selected&&!i.suggestionsDone&&hasSuggestions(i));
   if(quickMode){renderQuickEditors();return;}
   const expanded=new Set([...document.querySelectorAll('[data-options][open]')].map(el=>el.dataset.options));
   $('metadata-files').innerHTML=items.filter(i=>i.selected).map(item=>{
     const m=itemMeta(item), raw=m.category.startsWith('raw_');
-    return `<article class="file-editor" data-editor="${item.key}"><div class="file-editor-heading"><div><h3>${esc(item.name)}</h3><small>${bytes(item.bytes)}</small></div><label class="bulk-target"><input type="checkbox" data-bulk-target="${item.key}" ${item.bulkSelected?'checked':''}> Edición conjunta</label></div><div class="file-editor-grid">${rowSelect(item,'category','Tipo de archivo',Object.entries(state.categories).map(([k,v])=>[k,v.label]))}${rowSelect(item,'owner_kind','Registro',[['characterization','Caracterización · CAR'],['experiment','Experimento · EXP'],['sample','Muestra · MUE'],['result','Resultado · RES'],['other','Otro tipo']])}${rowInput(item,'owner_code','ID','text','placeholder="CAR-27, EXP-12, MUE-8…"')}${rowInput(item,'date','Fecha','date')}${rowInput(item,'content','Contenido','text','placeholder="Vacío: conservar descripción del nombre original"')}</div><p data-row-error="${item.key}" class="preview-error" role="alert">${esc(item.metaError||'')}</p>${raw?`<p class="row-raw-note">${m.category==='raw_original'?'Se conservan los nombres del equipo y todos los archivos interiores.':'Solo para un RAW independiente; el original se conserva.'}</p>`:''}${m.category==='raw_copy'?`<label class="check-row"><input type="checkbox" data-meta="independent_raw" data-row="${item.key}" ${m.independent_raw?'checked':''}> Confirmo que este RAW no depende de archivos auxiliares.</label>`:''}<details data-options="${item.key}" ${expanded.has(item.key)?'open':''}><summary>Técnica, muestras, réplica y otros datos</summary><div class="file-editor-grid">${rowInput(item,'technique','Técnica')}${rowInput(item,'samples','Muestras')}${rowInput(item,'replicate','Réplica','number','min="0" max="999"')}${rowInput(item,'version','Versión','number',`min="0" max="999" ${raw?'disabled':''}`)}${rowInput(item,'experiments','Experimentos relacionados')}${rowInput(item,'characterizations','Caracterizaciones relacionadas')}${rowInput(item,'note','Observación')}</div></details>${m.quick_name?`<label>Nombre manual activo (vacía para usar los campos del formulario)<input data-meta="quick_name" data-row="${item.key}" value="${esc(m.quick_name)}"></label>`:''}</article>`;
+    return `<article class="file-editor" data-editor="${item.key}"><div class="file-editor-heading"><div><h3>${esc(item.name)}</h3><small>${bytes(item.bytes)}</small></div><label class="bulk-target"><input type="checkbox" data-bulk-target="${item.key}" ${item.bulkSelected?'checked':''}> Edición conjunta</label></div>${suggestionPanel(item)}<div class="file-editor-grid">${rowSelect(item,'category','Tipo de archivo',Object.entries(state.categories).map(([k,v])=>[k,v.label]))}${rowSelect(item,'owner_kind','Registro',[['characterization','Caracterización · CAR'],['experiment','Experimento · EXP'],['sample','Muestra · MUE'],['result','Resultado · RES'],['other','Otro tipo']])}${rowInput(item,'owner_code','ID','text','placeholder="CAR-27, EXP-12, MUE-8…"')}${rowInput(item,'date','Fecha','date')}${rowInput(item,'content','Contenido','text','placeholder="Vacío: conservar descripción del nombre original"')}</div><p data-row-error="${item.key}" class="preview-error" role="alert">${esc(item.metaError||'')}</p>${raw?`<p class="row-raw-note">${m.category==='raw_original'?'Se conservan los nombres del equipo y todos los archivos interiores.':'Solo para un RAW independiente; el original se conserva.'}</p>`:''}${m.category==='raw_copy'?`<label class="check-row"><input type="checkbox" data-meta="independent_raw" data-row="${item.key}" ${m.independent_raw?'checked':''}> Confirmo que este RAW no depende de archivos auxiliares.</label>`:''}<details data-options="${item.key}" ${expanded.has(item.key)?'open':''}><summary>Técnica, muestras, réplica y otros datos</summary><div class="file-editor-grid">${rowInput(item,'technique','Técnica')}${rowInput(item,'samples','Muestras')}${rowInput(item,'replicate','Réplica','number','min="0" max="999"')}${rowInput(item,'version','Versión','number',`min="0" max="999" ${raw?'disabled':''}`)}${rowInput(item,'experiments','Experimentos relacionados')}${rowInput(item,'characterizations','Caracterizaciones relacionadas')}${rowInput(item,'note','Observación')}</div></details>${m.quick_name?`<label>Nombre manual activo (vacía para usar los campos del formulario)<input data-meta="quick_name" data-row="${item.key}" value="${esc(m.quick_name)}"></label>`:''}</article>`;
   }).join('');
+  bindSuggestions();queueLiveNames();
   document.querySelectorAll('[data-bulk-target]').forEach(el=>el.onchange=()=>{items.find(i=>i.key===el.dataset.bulkTarget).bulkSelected=el.checked;});
   document.querySelectorAll('[data-meta]').forEach(el=>{
     const update=()=>{
@@ -284,7 +287,10 @@ async function execute() {
   do{await new Promise(resolve=>setTimeout(resolve,650));job=await api('/api/job/'+start.job);}while(job.state==='running');
   unbusy();if(job.state==='error')throw new Error(job.error);
   const result=job.result,errors=result.results.filter(r=>r.status==='error').length;plan=null;
-  openModal(modalHeader(errors?'Lote terminado con incidencias':'Lote registrado',errors?'Revisa las entradas que no se han podido completar.':'Los archivos y sus nombres han quedado registrados.')+`<div class="modal-body"><div class="result-hero"><h3>${result.results.length-errors} de ${result.results.length} entrada(s) correctas</h3><p>${result.manifest?'El registro CSV está en tu carpeta de salida.':'Consulta los detalles de la operación en el historial.'}</p>${result.manifest?`<code>${esc(result.manifest)}</code>`:''}</div>${result.manifest_error?`<p class="preview-warning">${esc(result.manifest_error)}</p>`:''}${result.results.map(r=>`<div class="result-row"><div><strong>${esc(r.name)}</strong><code>${esc(r.destination)}</code>${r.error?`<p>${esc(r.error)}</p>`:''}</div><span class="status-tag ${r.status==='error'?'error':''}">${statusLabel(r.status)}</span></div>`).join('')}</div><div class="modal-footer"><p>Los archivos originales se han conservado.</p><div><button id="result-history" class="button">Ver historial</button><button id="result-back" class="button primary">${errors?"Corregir lote":"Preparar otro lote"}</button></div></div>`);
+  const destinations=[...new Set(result.results.filter(r=>['completado','ya_exportado','sin_cambio'].includes(r.status)).map(r=>r.destination.replace(/[\\/][^\\/]+$/,'')))];
+  openModal(modalHeader(errors?'Lote terminado con incidencias':'Lote registrado',errors?'Revisa las entradas que no se han podido completar.':'Los archivos y sus nombres han quedado registrados.')+`<div class="modal-body"><div class="result-hero"><h3>${result.results.length-errors} de ${result.results.length} entrada(s) correctas</h3><p>${result.manifest?'El registro CSV está en tu carpeta de salida.':'Consulta los detalles de la operación en el historial.'}</p>${result.manifest?`<code>${esc(result.manifest)}</code>`:''}</div>${result.manifest_error?`<p class="preview-warning">${esc(result.manifest_error)}</p>`:''}${destinations.length?`<section class="result-folders"><h3>Abrir destinos</h3>${destinations.map((p,n)=>`<label class="check-row"><input type="checkbox" data-result-folder="${n}"><code>${esc(p)}</code></label>`).join('')}<button id="open-result-folders" class="button">Abrir seleccionados</button><p id="open-folders-status" class="field-hint" role="status"></p></section>`:''}${result.results.map(r=>`<div class="result-row"><div><strong>${esc(r.name)}</strong><code>${esc(r.destination)}</code>${r.error?`<p>${esc(r.error)}</p>`:''}</div><span class="status-tag ${r.status==='error'?'error':''}">${statusLabel(r.status)}</span></div>`).join('')}</div><div class="modal-footer"><p>Los archivos originales se han conservado.</p><div><button id="result-history" class="button">Ver historial</button><button id="result-back" class="button primary">${errors?"Corregir lote":"Preparar otro lote"}</button></div></div>`);
+  if($('open-result-folders'))$('open-result-folders').onclick=()=>attempt(async()=>{const paths=[...document.querySelectorAll('[data-result-folder]:checked')].map(e=>destinations[Number(e.dataset.resultFolder)]);if(!paths.length)throw new Error('Marca los destinos que quieres abrir.');const response=await api('/api/open-destinations',{paths});$('open-folders-status').textContent=response.error||response.opened.length+' carpeta(s) abierta(s).';});
+  await refreshInboxStatus();
   $('result-back').onclick=()=>{$('modal').close();if(!errors)items=[];invalidate();setStep(errors?2:1);};
   $('result-history').onclick=()=>{$('modal').close();switchView('history');};
 }
@@ -297,7 +303,9 @@ async function renderHistory() {
   const data=await api('/api/history');historyRows=data.rows;selectedHistory.clear();filterHistory();$('history-location').textContent='Se muestran las últimas 5.000 operaciones.';
 }
 function filterHistory() {
-  const term=$('history-search').value.toLocaleLowerCase();const rows=historyRows.filter(r=>JSON.stringify(r).toLocaleLowerCase().includes(term));
+  const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();
+  const term=normalize($('history-search').value.trim());const rows=historyRows.filter(r=>normalize(JSON.stringify(r)).includes(term));
+  $('history-match-count').textContent=rows.length+' resultado(s) de '+historyRows.length+' operación(es) cargadas';
   $('history-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th><input id="history-select-visible" type="checkbox" aria-label="Seleccionar entradas visibles"></th><th>Fecha / operación</th><th>Original → salida</th><th>Registro / tipo</th><th>Estado</th></tr></thead><tbody>${rows.map(r=>`<tr><td><input type="checkbox" data-history-id="${r.id}" aria-label="Seleccionar operación de ${esc(r.original_name)}" ${selectedHistory.has(r.id)?'checked':''} ${r.status==='en_curso'?'disabled':''}></td><td>${esc(new Date(r.time).toLocaleString('es-ES'))}<br><small class="muted">${r.mode==='copy'?'Exportar copia':'Renombrar'} · ${bytes(r.bytes)}</small></td><td><div class="history-pair"><div>${esc(r.original_name)}</div><div class="arrow">↓</div><div><strong>${esc(r.name)}</strong></div><details><summary>Rutas de la operación</summary><code>Entrada: ${esc(r.source)}<br>Salida: ${esc(r.destination)}</code></details>${r.error?`<p class="preview-error">${esc(r.error)}</p>`:''}</div></td><td><strong>${esc(r.meta.owner_code)}</strong><br><small class="muted">${esc(state.categories[r.meta.category]?.label||r.meta.category)}</small></td><td><span class="status-tag ${esc(r.status)}">${esc(statusLabel(r.status))}</span></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty-state">Todavía no hay operaciones que mostrar.</div>';
 
   const eligible=rows.filter(r=>r.status!=='en_curso');
@@ -313,11 +321,13 @@ function confirmHistoryDeletion(){
   $('confirm-history-delete').onclick=async()=>{const button=$('confirm-history-delete');button.disabled=true;try{const result=await api('/api/history/delete',{ids,confirmed:true});$('modal').close();await renderHistory();toast(result.deleted+' entrada(s) eliminada(s) del historial.');}catch(error){$('history-delete-error').textContent=error.message;button.disabled=false;}};
 }
 async function switchView(view) {
-  currentView=view;$('section-name').textContent=({batch:'Nuevo lote',library:'Plantillas y favoritos',history:'Historial',audit:'Auditoría',guide:'Ayuda'})[view]||view;document.querySelectorAll('.view').forEach(el=>el.hidden=el.id!=='view-'+view);document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===view));
+  currentView=view;$('section-name').textContent=({batch:'Nuevo lote',library:'Plantillas y favoritos',history:'Historial',updates:'Actualizaciones',rules:'Reglas de clasificación',audit:'Auditoría',guide:'Ayuda'})[view]||view;document.querySelectorAll('.view').forEach(el=>el.hidden=el.id!=='view-'+view);document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===view));
+  if(view==='rules')await attempt(loadRules);
   if(view==='library')await attempt(loadLibrary);if(view==='history')await attempt(renderHistory);if(view==='guide')await attempt(async()=>{$('original-convention').textContent=(await api('/api/convention')).text;});window.scrollTo({top:0,behavior:'smooth'});
 }
 function bind() {
   $('delete-history').onclick=confirmHistoryDeletion;
+  $('clear-history-search').onclick=()=>{$('history-search').value='';filterHistory();$('history-search').focus();};
   $('header-help').onclick=e=>{e.preventDefault();switchView('guide');};
   document.querySelectorAll('[data-view]').forEach(el=>el.onclick=()=>switchView(el.dataset.view));
   $('previous-step').onclick=()=>setStep(quickMode&&wizardStep===4?2:Math.max(1,wizardStep-1));$('next-step').onclick=()=>attempt(nextStep);
@@ -338,7 +348,7 @@ function bind() {
   $('select-all').onchange=()=>{items.forEach(i=>i.selected=$('select-all').checked);invalidate();renderFiles();};$('clear-files').onclick=()=>{items=[];invalidate();renderFiles();};
   $('preview').onclick=()=>attempt(preview);$('refresh-history').onclick=()=>attempt(renderHistory);$('history-search').oninput=filterHistory;
   $('run-audit').onclick=()=>attempt(runAudit);
-  $('open-inbox').onclick=()=>attempt(()=>explore($('inbox').value));
+  bindIntake();
   $('shutdown').onclick=()=>{openModal(modalHeader('Cerrar aplicación','El historial y los archivos exportados se conservarán.')+'<div class="modal-body"><p>Se detendrá esta sesión. Para volver a abrirla, utiliza el acceso de la aplicación.</p></div><div class="modal-footer"><button class="button" data-close-modal>Seguir trabajando</button><button id="confirm-shutdown" class="button primary">Cerrar aplicación</button></div>');$('confirm-shutdown').onclick=()=>attempt(async()=>{await api('/api/shutdown',{});$('modal').close();toast('Aplicación cerrada. Ya puedes cerrar esta pestaña.');document.querySelectorAll('button').forEach(el=>el.disabled=true);});};
 }
 async function init() {
@@ -346,7 +356,7 @@ async function init() {
     state=await api('/api/state');keepSessionOpen();$('category').innerHTML=Object.entries(state.categories).map(([id,v])=>`<option value="${id}">${esc(v.label)}</option>`).join('');
     $('category').value='export';$('file-date').value=today();$('output-path').value='';
     await loadLibrary();updateOwner();updateCategory(false);updateMode();bind();bindQuick();setStep(1);
-    try{const structure=await api('/api/structure');$('inbox').innerHTML=structure.inboxes.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');$('open-inbox').disabled=!structure.inboxes.length;if(!$('input-path').value.trim())$('input-path').value=structure.inboxes[0]||'';$('drive-note').textContent='Si utilizas Drive, espera a que termine la sincronización antes de abrir el archivo en otro equipo.';}catch(e){$('open-inbox').disabled=true;toast(e.message,true);}
+    await loadRules();$('inbox').value=intakeConfig.inbox;$('input-path').value=intakeConfig.inbox;await refreshInboxStatus();await initUpdates();
   }catch(error){toast(error.message,true);$('empty-files').innerHTML='<h3>No se pudo iniciar PhDex</h3><p>Abre la app desde <strong>PhDex.exe</strong> y utiliza la nueva pestaña que se abra.</p>';}
 }
 
@@ -367,8 +377,9 @@ function renderQuickEditors(){
   const opened=new Set([...document.querySelectorAll('[data-quick-details][open]')].map(e=>e.dataset.quickDetails));
   $('metadata-files').innerHTML=items.filter(i=>i.selected).map(i=>{
     const m=itemMeta(i);if(!m.category){m.category='export';m.owner_kind=m.owner_kind||'characterization';}const raw=m.category.startsWith('raw_');
-    return `<article class="file-editor"><h3>${esc(i.name)}</h3><div class="quick-selects"><label>Plantilla<select data-quick-template="${i.key}" aria-label="Plantilla de ${esc(i.name)}"><option value="">Elegir plantilla…</option>${savedOptions('templates',i.templateId)}</select></label><label>Destino favorito<select data-quick-favorite="${i.key}" aria-label="Favorito de ${esc(i.name)}"><option value="">Elegir favorito…</option>${savedOptions('favorites',i.favoriteId)}</select></label><button class="button" data-quick-folder="${i.key}">Otra carpeta</button></div><p class="field-hint">${esc(i.templateLabel?'Plantilla: '+i.templateLabel:'Tipo: Exportación del equipo. Puedes cambiarlo en Fecha y más opciones.')}</p><code class="chosen-folder">${esc(i.output||'Falta elegir destino')}</code><p class="field-hint">Fecha: ${esc(m.date)} · ${esc(state.categories[m.category]?.label||'')} ${m.quick_name?'· Nombre manual activo (sustituye los campos de arriba)':''}</p><div class="quick-fields">${rowInput(i,'owner_code','ID','text','placeholder="CAR-27, EXP-12, MUE-8…"')}${rowInput(i,'content','Descripción','text','placeholder="Ej. Difractograma"')}</div><p class="field-hint">ID: CAR-27, EXP-12 o MUE-8. Descripción vacía: se utiliza el nombre original.</p><details data-quick-details="${i.key}" ${opened.has(i.key)?'open':''}><summary>Fecha y más opciones</summary><div class="file-editor-grid">${rowInput(i,'date','Fecha','date')}${rowSelect(i,'category','Tipo de archivo',Object.entries(state.categories).map(([k,v])=>[k,v.label]))}${rowInput(i,'technique','Técnica')}${rowInput(i,'samples','Muestras')}${rowInput(i,'replicate','Réplica','number','min="0" max="999"')}${rowInput(i,'version','Versión','number',`min="0" max="999" ${raw?'disabled':''}`)}</div></details>${raw?`<p class="info-note">${m.category==='raw_original'?'Se conservarán todos los nombres originales.':'Solo para RAW independiente.'}</p>`:''}${m.category==='raw_copy'?`<label class="check-row"><input data-qmeta="independent_raw" data-row="${i.key}" type="checkbox" ${m.independent_raw?'checked':''}> Confirmo que es un RAW independiente.</label>`:''}${i.kind!=='folder'&&!raw?`<details><summary>Escribir directamente el nombre completo (opcional)</summary><label>Nombre sin extensión<input data-qmeta="quick_name" data-row="${i.key}" value="${esc(m.quick_name||'')}" placeholder="2026-10-21_CAR-27_Difractograma"></label><p class="field-hint">Sustituye ID, fecha y descripción al exportar. Debe seguir AAAA-MM-DD_ID_Descripción; se conserva la extensión original. Vacíalo para usar los campos de arriba.</p></details>`:''}</article>`;
+    return `<article class="file-editor"><h3>${esc(i.name)}</h3>${suggestionPanel(i)}<div class="quick-selects"><label>Plantilla<select data-quick-template="${i.key}" aria-label="Plantilla de ${esc(i.name)}"><option value="">Elegir plantilla…</option>${savedOptions('templates',i.templateId)}</select></label><label>Destino favorito<select data-quick-favorite="${i.key}" aria-label="Favorito de ${esc(i.name)}"><option value="">Elegir favorito…</option>${savedOptions('favorites',i.favoriteId)}</select></label><button class="button" data-quick-folder="${i.key}">Otra carpeta</button></div><p class="field-hint">${esc(i.templateLabel?'Plantilla: '+i.templateLabel:'Tipo: Exportación del equipo. Puedes cambiarlo en Fecha y más opciones.')}</p><code class="chosen-folder">${esc(i.output||'Falta elegir destino')}</code><p class="field-hint">Fecha: ${esc(m.date)} · ${esc(state.categories[m.category]?.label||'')} ${m.quick_name?'· Nombre manual activo (sustituye los campos de arriba)':''}</p><div class="quick-fields">${rowInput(i,'owner_code','ID','text','placeholder="CAR-27, EXP-12, MUE-8…"')}${rowInput(i,'content','Descripción','text','placeholder="Ej. Difractograma"')}</div><p class="field-hint">ID: CAR-27, EXP-12 o MUE-8. Descripción vacía: se utiliza el nombre original.</p><details data-quick-details="${i.key}" ${opened.has(i.key)?'open':''}><summary>Fecha y más opciones</summary><div class="file-editor-grid">${rowInput(i,'date','Fecha','date')}${rowSelect(i,'category','Tipo de archivo',Object.entries(state.categories).map(([k,v])=>[k,v.label]))}${rowInput(i,'technique','Técnica')}${rowInput(i,'samples','Muestras')}${rowInput(i,'replicate','Réplica','number','min="0" max="999"')}${rowInput(i,'version','Versión','number',`min="0" max="999" ${raw?'disabled':''}`)}</div></details>${raw?`<p class="info-note">${m.category==='raw_original'?'Se conservarán todos los nombres originales.':'Solo para RAW independiente.'}</p>`:''}${m.category==='raw_copy'?`<label class="check-row"><input data-qmeta="independent_raw" data-row="${i.key}" type="checkbox" ${m.independent_raw?'checked':''}> Confirmo que es un RAW independiente.</label>`:''}${i.kind!=='folder'&&!raw?`<details><summary>Escribir directamente el nombre completo (opcional)</summary><label>Nombre sin extensión<input data-qmeta="quick_name" data-row="${i.key}" value="${esc(m.quick_name||'')}" placeholder="2026-10-21_CAR-27_Difractograma"></label><p class="field-hint">Sustituye ID, fecha y descripción al exportar. Debe seguir AAAA-MM-DD_ID_Descripción; se conserva la extensión original. Vacíalo para usar los campos de arriba.</p></details>`:''}</article>`;
   }).join('');
+  bindSuggestions();queueLiveNames();
   document.querySelectorAll('#metadata-files [data-meta],#metadata-files [data-qmeta]').forEach(el=>{
     const update=()=>{const i=items.find(i=>i.key===el.dataset.row),field=el.dataset.meta||el.dataset.qmeta;
       i.override=MetadataModel.change(itemMeta(i),field,el.type==='checkbox'?el.checked:el.value,state.categories[el.value]?.owner||'');
@@ -398,6 +409,127 @@ function editSaved(group,id){
     $('saved-pick').onclick=()=>attempt(async()=>{Object.assign(draft,form());$('modal').close();const paths=await pickFolder(draft.output||state.doctorado);if(paths.length)draft.output=paths[0];draw();});
     $('saved-form').onsubmit=async e=>{e.preventDefault();const button=e.submitter;if(button)button.disabled=true;try{library=await api('/api/library',{revision:library.revision,group,id,value:form()});$('modal').close();renderLibrary();renderMetadataEditors();toast('Guardado para los próximos lotes.');}catch(error){$('saved-error').textContent=error.message;}finally{if(button)button.disabled=false;}};
   };draw();
+}
+
+let intakeConfig, namesTimer, namesRevision=0;
+function hasSuggestions(i){return Object.keys(i.suggestions?.meta||{}).length||(i.suggestions?.matches||[]).length;}
+function suggestionPanel(i){
+  const s=i.suggestions||{meta:{},notes:[],matches:[]},m=s.meta;
+  return `<div class="live-name"><small>Nombre resultante</small><code data-live-name="${i.key}" role="status">Completando datos…</code></div>`+(i.suggestionsDone||(!hasSuggestions(i)&&!s.notes.length)?'':`<section class="suggestion-panel"><strong>Sugerencias para este archivo</strong><p>${esc([m.date,m.owner_code,m.technique,m.quick_name?'Nombre completo reconocido':''].filter(Boolean).join(' · ')||'Regla de clasificación disponible')}${s.notes.length?' · '+esc(s.notes.join(' ')):''}</p>${s.matches.length?`<label>Regla coincidente<select data-rule-choice="${i.key}">${s.matches.length>1?'<option value="">Elige una regla (hay varias)…</option>':''}${s.matches.map((r,n)=>`<option value="${n}">${esc(r.rule+' → '+r.template.label)}</option>`).join('')}</select></label>`:''}<div class="source-actions">${hasSuggestions(i)?`<button class="button small" data-accept-suggestion="${i.key}">Aceptar sugerencia</button>`:''}<button class="text-button" data-dismiss-suggestion="${i.key}">Descartar</button></div></section>`);
+}
+function acceptSuggestion(i,all=false){
+  const s=i.suggestions,choice=document.querySelector(`[data-rule-choice="${i.key}"]`);
+  if(s.matches.length>1&&(!choice||choice.value==='')){if(all)return false;throw new Error('Coinciden varias reglas. Elige cuál usar para '+i.name+'.');}
+  const match=s.matches.length?s.matches[Number(choice?.value||0)]:null;
+  let meta={...itemMeta(i)};
+  if(match){const t=match.template;meta={...meta,...t.meta,independent_raw:false};i.output=t.output;i.templateId=t.id;i.templateLabel=t.label;i.favoriteId=null;i.routeMeta=null;}
+  meta={...meta,...s.meta};
+  if(meta.category?.startsWith('raw_')||i.kind==='folder')delete meta.quick_name;
+  i.override=meta;i.suggestionsDone=true;invalidate();return true;
+}
+function bindSuggestions(){
+  document.querySelectorAll('[data-accept-suggestion]').forEach(b=>b.onclick=()=>attempt(async()=>{acceptSuggestion(items.find(i=>i.key===b.dataset.acceptSuggestion));renderMetadataEditors();if(!quickMode)renderDestinations();}));
+  document.querySelectorAll('[data-dismiss-suggestion]').forEach(b=>b.onclick=()=>{items.find(i=>i.key===b.dataset.dismissSuggestion).suggestionsDone=true;renderMetadataEditors();});
+}
+function queueLiveNames(){
+  clearTimeout(namesTimer);const revision=++namesRevision;
+  namesTimer=setTimeout(async()=>{
+    const entries=items.filter(i=>i.selected&&document.querySelector(`[data-live-name="${i.key}"]`)).map(i=>({key:i.key,path:i.path,meta:itemMeta(i)}));
+    if(!entries.length)return;
+    try{const response=await api('/api/names',{items:entries});if(revision!==namesRevision)return;
+      for(const row of response.items){const el=document.querySelector(`[data-live-name="${row.key}"]`);if(el){el.textContent=row.error||row.name;el.className=row.error?'muted':'';}}
+    }catch(e){if(revision===namesRevision)document.querySelectorAll('[data-live-name]').forEach(el=>el.textContent='No se pudo actualizar: '+e.message);}
+  },280);
+}
+async function loadRules(){intakeConfig=await api('/api/intake');renderRules();}
+function renderRules(){
+  $('rules-list').innerHTML=intakeConfig.rules.length?intakeConfig.rules.map(r=>{const t=library.templates.find(t=>t.id===r.template);return `<div class="saved-item"><div><strong>${esc(r.label)}</strong><small>${r.match==='contains'?'El nombre contiene':'Extensión'}: ${esc(r.pattern)} → ${esc(t?.label||'Plantilla eliminada: edita la regla')}</small></div><div class="rule-actions"><button class="button small" data-edit-rule="${r.id}">Editar</button><button class="text-button" data-delete-rule="${r.id}">Quitar</button></div></div>`;}).join(''):'<p class="muted">Crea primero una plantilla con sus datos y destino; después podrás vincularla a una regla.</p>';
+  document.querySelectorAll('[data-edit-rule]').forEach(b=>b.onclick=()=>editRule(b.dataset.editRule));
+  document.querySelectorAll('[data-delete-rule]').forEach(b=>b.onclick=()=>{openModal(modalHeader('Quitar regla','Los archivos y las plantillas se conservan.')+'<div class="modal-footer"><button class="button" data-close-modal>Cancelar</button><button class="button danger" id="confirm-rule-delete">Quitar regla</button></div>');$('confirm-rule-delete').onclick=()=>attempt(async()=>{intakeConfig=await api('/api/intake',{revision:intakeConfig.revision,id:b.dataset.deleteRule,delete:true});$('modal').close();renderRules();});});
+}
+function editRule(id){
+  if(!library.templates.length){toast('Crea primero una plantilla en Plantillas y favoritos.',true);return;}
+  const row=intakeConfig.rules.find(r=>r.id===id)||{};
+  openModal(modalHeader(id?'Editar regla':'Nueva regla','La coincidencia ignora mayúsculas. Se propondrá la plantilla; tú confirmarás los datos.')+`<form id="rule-form"><div class="modal-body"><label>Nombre de la regla<input id="rule-label" required maxlength="80" value="${esc(row.label||'')}" placeholder="Ej. Exportaciones DRX"></label><label>Buscar por<select id="rule-match"><option value="contains">Texto incluido en el nombre</option><option value="extension" ${row.match==='extension'?'selected':''}>Extensión</option></select></label><label>Texto o extensión<input id="rule-pattern" required maxlength="120" value="${esc(row.pattern||'')}" placeholder="Ej. DRX, csv o csv.gz"><small class="input-help">Texto literal, sin asteriscos. Una regla se cumple si encuentra ese texto, o la extensión completa indicada.</small></label><label>Proponer plantilla<select id="rule-template">${savedOptions('templates',row.template)}</select></label><p class="field-hint">No se inventan IDs ni fechas. El reconocimiento del nombre prevalece sobre la técnica de la plantilla; revisa la vista previa. Si un nombre completo ya cumple la convención, se conserva mediante Nombre manual.</p><p id="rule-error" class="preview-error" role="alert"></p></div><div class="modal-footer"><button type="button" class="button" data-close-modal>Cancelar</button><button class="button primary">Guardar regla</button></div></form>`);
+  $('rule-form').onsubmit=async e=>{e.preventDefault();e.submitter.disabled=true;try{intakeConfig=await api('/api/intake',{revision:intakeConfig.revision,id,value:{label:$('rule-label').value,match:$('rule-match').value,pattern:$('rule-pattern').value,template:$('rule-template').value}});$('modal').close();renderRules();}catch(error){$('rule-error').textContent=error.message;}finally{e.submitter.disabled=false;}};
+}
+async function refreshInboxStatus(){
+  try{const data=await api('/api/inbox',{}),pending=data.items.filter(i=>!i.exported).length;$('inbox-status').textContent=pending+' pendiente(s) · '+(data.items.length-pending)+' exportado(s) según historial';}
+  catch(error){$('inbox-status').textContent=error.message;}
+}
+async function reviewInbox(){
+  busy('Revisando archivos de entrada…');const data=await api('/api/inbox',{});unbusy();
+  openModal(modalHeader('Revisar entrada',data.path)+`<div class="modal-body"><label class="check-row"><input id="pending-only" type="checkbox" checked> Mostrar solo pendientes</label><button class="button small" id="mark-pending">Marcar pendientes</button><div id="inbox-entries">${data.items.map((i,n)=>`<label class="folder-entry ${i.exported?'exported':''}" data-inbox-row="${n}" ${i.exported?'hidden':''}><input type="checkbox" data-inbox-entry="${n}"><span>${esc(i.name)}<small class="muted"> · ${esc(i.pending_note)}${i.kind==='folder'?' · Carpeta completa':''}</small></span></label>`).join('')}</div>${!data.items.length?'<p>La carpeta está vacía.</p>':''}<p id="no-pending" ${data.items.some(i=>!i.exported)?'hidden':''}>No hay archivos pendientes.</p><p class="field-hint">${esc(data.note)}</p></div><div class="modal-footer"><button class="button" data-close-modal>Cancelar</button><button id="add-inbox-entries" class="button primary">Añadir seleccionados</button></div>`);
+  $('pending-only').onchange=()=>{document.querySelectorAll('[data-inbox-row]').forEach(e=>{e.hidden=$('pending-only').checked&&data.items[Number(e.dataset.inboxRow)].exported;if(e.hidden)e.querySelector('input').checked=false;});$('no-pending').hidden=!$('pending-only').checked||data.items.some(i=>!i.exported);};
+  $('mark-pending').onclick=()=>document.querySelectorAll('[data-inbox-entry]').forEach(e=>e.checked=!data.items[Number(e.dataset.inboxEntry)].exported);
+  $('add-inbox-entries').onclick=()=>attempt(async()=>{const paths=[...document.querySelectorAll('[data-inbox-entry]:checked')].map(e=>data.items[Number(e.dataset.inboxEntry)].path);$('modal').close();await addPaths(paths);});
+}
+async function importDropped(files){
+  if(!files.length)return;
+  if(items.length+files.length>500)throw new Error('Límite de 500 entradas por lote.');
+  busy('Importando a la carpeta de entrada…');const paths=[],errors=[];
+  try{for(let n=0;n<files.length;n++){
+    const file=files[n];$('busy-text').textContent=`Importando ${n+1} de ${files.length}: ${file.name}`;
+    try{
+      if(file.size>2*1024**3)throw new Error('Para más de 2 GB usa Seleccionar archivos.');
+      const name=btoa(String.fromCharCode(...new TextEncoder().encode(file.name)));
+      const response=await fetch('/api/import',{method:'POST',headers:{'X-App-Key':key,'Content-Type':'application/octet-stream','X-File-Name':name},body:file});
+      const result=await response.json();if(!response.ok)throw new Error(result.error);paths.push(result.path);
+    }catch(error){errors.push(file.name+': '+error.message);}
+  }}finally{unbusy();}
+  if(paths.length)await addPaths(paths);
+  $('drop-status').textContent=paths.length+' archivo(s) copiado(s) a Entrada.';await refreshInboxStatus();
+  if(errors.length)openModal(modalHeader('Archivos que requieren atención','Los archivos importados correctamente permanecen en el lote. Los originales se conservan.')+`<div class="modal-body">${errors.map(e=>`<p class="preview-error">${esc(e)}</p>`).join('')}</div><div class="modal-footer"><button class="button" data-close-modal>Cerrar</button></div>`);
+}
+function bindIntake(){
+  $('open-inbox').onclick=()=>attempt(reviewInbox);
+  $('change-inbox').onclick=()=>attempt(async()=>{const paths=await pickFolder(intakeConfig.inbox);if(!paths.length)return;intakeConfig=await api('/api/intake',{revision:intakeConfig.revision,inbox:paths[0]});$('inbox').value=intakeConfig.inbox;$('input-path').value=intakeConfig.inbox;await refreshInboxStatus();});
+  $('new-rule').onclick=()=>editRule();$('refresh-rules').onclick=()=>attempt(async()=>{await loadLibrary();await loadRules();});
+  $('accept-all-suggestions').onclick=()=>attempt(async()=>{let count=0;for(const i of items.filter(i=>i.selected&&!i.suggestionsDone&&hasSuggestions(i)))if(acceptSuggestion(i,true))count++;renderMetadataEditors();if(!quickMode)renderDestinations();toast(count+' sugerencia(s) aceptada(s). Las coincidencias múltiples requieren elegir regla.');});
+  const zone=$('drop-zone');zone.onclick=()=>$('drop-file-input').click();zone.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();zone.click();}};
+  $('drop-file-input').onchange=e=>{const files=[...e.target.files];e.target.value='';attempt(()=>importDropped(files));};
+  window.addEventListener('dragover',e=>{if([...e.dataTransfer.types].includes('Files'))e.preventDefault();});
+  window.addEventListener('drop',e=>{if([...e.dataTransfer.types].includes('Files'))e.preventDefault();});
+  zone.ondragover=e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';zone.classList.add('drag-over');};zone.ondragleave=e=>{if(!zone.contains(e.relatedTarget))zone.classList.remove('drag-over');};
+  zone.ondrop=e=>{e.preventDefault();zone.classList.remove('drag-over');if(!$('busy').hidden)return;const entries=[...e.dataTransfer.items];if(entries.some(i=>i.webkitGetAsEntry?.()?.isDirectory)){toast('Para añadir una carpeta con todos sus archivos usa Copiar una carpeta entera.',true);return;}const files=[...e.dataTransfer.files];attempt(()=>importDropped(files));};
+}
+let versionState,availableUpdate=null,updatesRestarting=false;
+async function initUpdates(){
+  versionState=await api('/api/version');
+  $('version-badge').textContent='PhDex '+versionState.version;
+  $('installed-version').textContent='Versión instalada: '+versionState.version;
+  $('automatic-updates').checked=versionState.automatic;
+  $('version-badge').onclick=()=>switchView('updates');
+  $('check-updates').onclick=()=>attempt(()=>checkUpdates(false));
+  $('install-update').onclick=()=>confirmUpdate();
+  $('automatic-updates').onchange=()=>attempt(async()=>{const checked=$('automatic-updates').checked;try{await api('/api/updates/settings',{automatic:checked});versionState.automatic=checked;}catch(e){$('automatic-updates').checked=!checked;throw e;}});
+  if(versionState.packaged)checkUpdates(true);
+  else $('update-status').textContent='Esta sesión usa el código fuente. La actualización integrada funciona desde PhDex.exe.';
+}
+async function checkUpdates(startup){
+  $('check-updates').disabled=true;$('update-status').textContent='Consultando la última versión publicada…';
+  try{
+    const result=await api('/api/updates/check',{});availableUpdate=result;
+    $('install-update').hidden=!result.available||!versionState.packaged;
+    $('update-status').textContent=result.available?'Disponible: '+result.latest+'. Tu versión es '+result.current+'.':(result.current===result.latest?'PhDex está actualizado ('+result.current+').':'Tu versión '+result.current+' es posterior a la última publicación ('+result.latest+').');
+    $('version-badge').textContent='PhDex '+versionState.version+(result.available?' · Actualización disponible':'');
+    if(startup&&result.available&&versionState.automatic&&items.length===0&&currentView==='batch'&&wizardStep===1&&!$('modal').open)await installUpdate();
+  }catch(error){$('update-status').textContent=error.message;if(!startup)toast(error.message,true);}
+  finally{$('check-updates').disabled=false;}
+}
+function confirmUpdate(){
+  openModal(modalHeader('Actualizar PhDex','Se descargará la nueva versión y se reiniciará la aplicación.')+`<div class="modal-body"><p>El historial, las plantillas y los archivos se conservan. ${items.length?'Los datos del lote que estás preparando no se guardan al reiniciar. Termina de exportarlo primero si quieres conservarlos.':''}</p><p id="update-confirm-error" class="preview-error" role="alert"></p></div><div class="modal-footer"><button class="button" data-close-modal>Continuar trabajando</button><button class="button primary" id="confirm-install-update">Actualizar y reiniciar</button></div>`);
+  $('confirm-install-update').onclick=()=>attempt(installUpdate);
+}
+async function installUpdate(){
+  busy('Descargando actualización de PhDex…');
+  try{
+    const start=await api('/api/updates/install',{confirmed:true});updatesRestarting=true;let job;
+    do{await new Promise(resolve=>setTimeout(resolve,500));job=await api('/api/job/'+start.job);$('busy-text').textContent=job.message||'Preparando reinicio…';}while(job.state==='running');
+    if(job.state==='error'){updatesRestarting=false;throw new Error(job.error);}
+    unbusy();if($('modal').open)$('modal').close();
+    openModal(modalHeader('PhDex se está actualizando','La nueva versión se abrirá en otra pestaña.')+'<div class="modal-body"><p>Puedes cerrar esta pestaña cuando aparezca la nueva ventana. Los datos guardados se conservan. Si Windows no permite completar el reemplazo, te mostrará el motivo y conservará la copia anterior.</p></div>');
+  }catch(error){unbusy();updatesRestarting=false;$('update-status').textContent=error.message;throw error;}
 }
 
 init();

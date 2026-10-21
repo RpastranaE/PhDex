@@ -56,3 +56,9 @@ Renovación visual y de textos. Sin cambios en el motor de copia ni en la biblio
 
 ## PhDex 2.0: EXE y Documentos
 61 pruebas Python y 5 JavaScript. Ejecutable Windows x64 con icono y versión integrados, sin consola. Prueba real del EXE con Python externo no configurado: recursos web, SQLite, biblioteca, copia, colisión, borrado confirmado y reinicio persistente. Datos predeterminados en Documentos/PhDex/datos_app; migración SQLite consistente y sin sobrescribir destinos existentes.
+
+## Versión 2.1
+
+71 pruebas Python y 5 JavaScript: reconocimiento conservador y ambigüedades, reglas múltiples y referencias a plantillas eliminadas, carpeta de entrada configurable, importación interrumpida/sin sobrescrituras/nombres inválidos, pendientes modificados o con salida ausente, vista de nombres y apertura restringida a destinos registrados. Prueba del ejecutable con estado temporal, copias, colisiones, pendientes y reinicio. Prueba visual del recorrido con datos sintéticos, sugerencias, vista previa e importación desde navegador. Sin exportaciones ni borrados sobre archivos reales.
+
+Actualizador: comparación de versiones sin regresiones, rechazo de publicaciones preliminares o assets ajenos, descargas truncadas y tamaño/formato inválidos, limitación a HTTPS GitHub, bloqueo con copias en curso o varias pestañas, preferencias persistentes y prueba del ayudante integrado con respaldo, reemplazo y reinicio sobre una instalación aislada. No requiere PowerShell ni altera políticas de Windows.

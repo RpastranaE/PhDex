@@ -68,10 +68,17 @@ def check_executable(executable):
             assert request('/api/convention')['text']
             state=request('/api/state')
             assert Path(state['history_path'])==data_dir.resolve()/'registro.sqlite3'
+            intake=request('/api/intake')
+            assert Path(intake['inbox'])==inbox
+            assert request('/api/inbox',{})['items'][0]['pending_note']=='Pendiente'
+            recognized=inbox/'DRX CAR-27 2026-10-21.csv';recognized.write_bytes(b'synthetic')
+            suggestion=request('/api/inspect',{'paths':[str(recognized)]})['items'][0]['suggestions']
+            assert suggestion['meta']['owner_code']=='CAR-27'
             request('/api/library',{'revision':0,'group':'favorites','value':{'label':'Prueba','output':str(output)}})
             item={'path':str(source),'output':str(output),'meta':{'category':'record',
                 'owner_kind':'experiment','owner_code':'EXP-12','date':'2026-10-21','content':'Ensayo'}}
             plan=request('/api/preview',{'mode':'copy','items':[item]})
+            assert request('/api/names',{'items':[{'key':'smoke',**item}]})['items'][0]['name']=='2026-10-21_EXP-12_Ensayo.csv'
             assert plan['valid'],plan
             job=request('/api/execute',{'plan_id':plan['id']})
             deadline=time.monotonic()+30
@@ -85,6 +92,7 @@ def check_executable(executable):
             assert source.read_bytes()==target.read_bytes()
             assert not request('/api/preview',{'mode':'copy','items':[item]})['valid']
             rows=request('/api/history')['rows'];assert len(rows)==1
+            assert next(r for r in request('/api/inbox',{})['items'] if r['name']=='ensayo.csv')['exported']
             assert request('/api/history/delete',{'ids':[rows[0]['id']],'confirmed':True})['deleted']==1
             assert source.exists() and target.exists()
         finally:stop(process,request)

@@ -22,6 +22,8 @@ from workflow import structure, recommend, audit, safe_path, ROOTS
 from folders import SessionFolders
 from library import Library
 from storage import default_data_dir, migrate_legacy_data
+from intake import Intake
+from updater import Updater, VERSION, RELEASES_URL, launch_replacement
 
 ROOT = Path(__file__).resolve().parent
 
@@ -96,6 +98,8 @@ class LocalApp:
         self.engine.doctorado = self.doctorado
         self.folders = SessionFolders(self.doctorado)
         self.library = Library(data_dir)
+        self.intake = Intake(data_dir, self.doctorado, self.library, self.engine)
+        self.updater = Updater(data_dir)
         self.key = secrets.token_urlsafe(32)
         self.jobs = {}
         self.jobs_lock = threading.Lock()
@@ -170,9 +174,38 @@ class LocalApp:
         threading.Thread(target=run, daemon=True).start()
         return {"job": job_id}
 
+    def start_update(self, confirmed):
+        if confirmed is not True:
+            raise UserError('Confirma la actualización y el reinicio de PhDex.')
+        if not getattr(sys,'frozen',False):
+            raise UserError('La actualización integrada se usa desde PhDex.exe. Esta sesión ejecuta el código fuente.')
+        with self.jobs_lock:
+            if self.closing or any(j['state']=='running' for j in self.jobs.values()):
+                raise UserError('Espera a que termine la operación en curso.')
+            if len(self.clients)>1:
+                raise UserError('Cierra las otras pestañas de PhDex antes de actualizar.')
+            job_id=uuid.uuid4().hex
+            job={'state':'running','message':'Descargando la nueva versión…'}
+            self.jobs[job_id]=job
+        def run():
+            try:
+                stage,info=self.updater.download()
+                job['message']='Preparando copia de seguridad y reinicio…'
+                launch_replacement(stage,Path(sys.executable),self.engine.data_dir,self.doctorado,os.getpid())
+                with self.jobs_lock:
+                    self.closing=True
+                    job.update(state='done',result={'version':info['latest'],'restarting':True})
+                # Give the browser a short chance to show the restart message.
+                time.sleep(2)
+                self.server.shutdown()
+            except Exception as exc:
+                with self.jobs_lock:job.update(state='error',error=str(exc))
+        threading.Thread(target=run,daemon=True).start()
+        return {'job':job_id}
+
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "PhDex/2.0"
+    server_version = "PhDex/2.1"
 
     @property
     def app(self):
@@ -247,6 +280,10 @@ class Handler(BaseHTTPRequestHandler):
                                           "preferences": self.app.prefs(), "history_path": str(self.app.engine.dbpath), "native_picker": os.name == "nt", "doctorado": str(self.app.doctorado), "folder_roots":{p:str(self.app.doctorado / n) for p,n in ROOTS.items()}})
             if path == "/api/library":
                 return self.response(200, self.app.library.read())
+            if path == '/api/intake':
+                return self.response(200, self.app.intake.read())
+            if path == '/api/version':
+                return self.response(200, {'version':VERSION,'packaged':bool(getattr(sys,'frozen',False)), 'releases_url':RELEASES_URL,'automatic':self.app.updater.automatic()})
             if path == "/api/structure":
                 return self.response(200, structure(self.app.doctorado))
             if path == "/api/history":
@@ -267,6 +304,21 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.authenticated():
             return self.response(403, {"error": "Sesión local no válida."})
+        if urlsplit(self.path).path == '/api/import':
+            try:
+                if self.headers.get('Content-Type') != 'application/octet-stream':
+                    raise UserError('Selecciona archivos para arrastrar.')
+                name = base64.b64decode(self.headers.get('X-File-Name',''),validate=True).decode('utf-8')
+                length = int(self.headers.get('Content-Length','-1'))
+                self.connection.settimeout(120)
+                with self.app.jobs_lock:
+                    if self.app.closing or any(j['state']=='running' for j in self.app.jobs.values()):
+                        raise UserError('Espera a que termine la exportación antes de importar.')
+                    imported = self.app.intake.import_file(name,self.rfile,length)
+                return self.response(200, {'path':imported})
+            except (OSError, ValueError, UserError) as exc:
+                self.close_connection = True
+                return self.response(400, {'error':str(exc)})
         if not self.headers.get("Content-Type", "").startswith("application/json"):
             return self.response(415, {"error": "Se requiere JSON."})
         try:
@@ -277,10 +329,60 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(request, dict):
                 raise UserError("Petición no válida.")
             path = urlsplit(self.path).path
+            if path == '/api/updates/check':
+                return self.response(200,self.app.updater.check())
+            if path == '/api/updates/install':
+                return self.response(200,self.app.start_update(request.get('confirmed')))
+            if path == '/api/updates/settings':
+                return self.response(200,self.app.updater.set_automatic(request.get('automatic')))
+            if path == '/api/intake':
+                return self.response(200,self.app.intake.change(request))
+            if path == '/api/inbox':
+                return self.response(200,self.app.intake.listing())
+            if path == '/api/names':
+                entries=request.get('items',[])
+                if not isinstance(entries,list) or len(entries)>500:
+                    raise UserError('Límite de 500 archivos.')
+                rows=[]
+                for entry in entries:
+                    try:
+                        source=safe_path(entry.get('path'))
+                        if not source.exists(): raise UserError('El archivo ya no está disponible.')
+                        name=metadata(entry.get('meta',{}),source)['exported_name']
+                        rows.append({'key':entry.get('key'),'name':name,'error':''})
+                    except (UserError,OSError) as exc:
+                        rows.append({'key':entry.get('key'),'name':'','error':str(exc)})
+                return self.response(200,{'items':rows})
+            if path == '/api/open-destinations':
+                paths=request.get('paths',[])
+                if not isinstance(paths,list) or not 1<=len(paths)<=20:
+                    raise UserError('Selecciona entre 1 y 20 destinos.')
+                allowed=set()
+                with self.app.engine.db() as db:
+                    rows=db.execute("SELECT destination FROM actions WHERE status IN ('completado','ya_exportado','sin_cambio')").fetchall()
+                for row in rows:
+                    allowed.add(os.path.normcase(str(Path(row['destination']).parent.resolve())))
+                targets=[]
+                for raw in dict.fromkeys(paths):
+                    folder=safe_path(raw).resolve()
+                    if not folder.is_dir() or os.path.normcase(str(folder)) not in allowed:
+                        raise UserError('Solo se pueden abrir carpetas con exportaciones registradas.')
+                    targets.append(folder)
+                if os.name!='nt': raise UserError('Abrir carpetas está disponible en Windows.')
+                opened=[]
+                for folder in targets:
+                    try:
+                        os.startfile(str(folder));opened.append(str(folder))
+                    except OSError as exc:
+                        return self.response(200,{'opened':opened,'error':'No se pudo abrir '+str(folder)+': '+str(exc)})
+                return self.response(200,{'opened':opened})
             if path == "/api/library":
                 return self.response(200, self.app.library.change(request))
             if path == "/api/inspect":
-                return self.response(200, {"items": self.app.engine.inspect(request.get("paths", []))})
+                inspected=self.app.engine.inspect(request.get('paths',[]))
+                for item in inspected:
+                    item['suggestions']=self.app.intake.suggestions(item['name']) if item['kind']=='file' else {'meta':{},'notes':[],'matches':[]}
+                return self.response(200, {"items": inspected})
             if path == '/api/history/delete':
                 with self.app.jobs_lock:
                     if self.app.closing or any(j['state'] == 'running' for j in self.app.jobs.values()):
@@ -386,7 +488,11 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        if len(sys.argv)==3 and sys.argv[1]=='--apply-update':
+            from updater import apply_update
+            raise SystemExit(apply_update(sys.argv[2]))
+        else:
+            main()
     except Exception:
         error_dir = default_data_dir().parent
         error_dir.mkdir(parents=True, exist_ok=True)

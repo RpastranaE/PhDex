@@ -6,7 +6,7 @@ import sqlite3
 import uuid
 from contextlib import closing
 
-FILES=('registro.sqlite3','preferencias.json','plantillas_favoritos.json')
+FILES=('registro.sqlite3','preferencias.json','plantillas_favoritos.json','entrada_reglas.json','actualizador.json')
 
 
 def documents_dir():
