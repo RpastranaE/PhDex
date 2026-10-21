@@ -8,12 +8,13 @@ import subprocess
 import tempfile
 import time
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 import uuid
 
 
 def check_executable(executable):
     with tempfile.TemporaryDirectory(prefix='phdex-exe-') as temp:
-        root=Path(temp)
+        root=Path(temp).resolve()
         portable=root/'portable';portable.mkdir()
         exe=portable/'PhDex.exe';shutil.copy2(executable,exe)
         doctorado=root/'Doctorado'
@@ -42,9 +43,12 @@ def check_executable(executable):
                 data=None if body is None else json.dumps(body).encode()
                 req=Request('http://127.0.0.1:'+str(info['port'])+path,data=data,
                     headers={'X-App-Key':info['key'],'Content-Type':'application/json'})
-                with urlopen(req,timeout=20) as response:
-                    content=response.read()
-                    return json.loads(content) if 'application/json' in response.headers.get('Content-Type','') else content
+                try:
+                    with urlopen(req,timeout=20) as response:
+                        content=response.read()
+                        return json.loads(content) if 'application/json' in response.headers.get('Content-Type','') else content
+                except HTTPError as error:
+                    raise AssertionError(path+': '+error.read().decode('utf-8')) from error
             return process,request
 
         def stop(process,request):
