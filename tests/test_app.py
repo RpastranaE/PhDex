@@ -156,6 +156,7 @@ class LocalServerTests(unittest.TestCase):
         self.app.connect_client('reload')
         self.assertFalse(self.app.close_if_unused(closed_at + 6))
         self.app.disconnect_client('reload')
+        self.app.empty_since = 1000.0  # Exact boundary independent of monotonic clock magnitude.
         self.assertTrue(self.app.close_if_unused(self.app.empty_since + 5))
         with self.assertRaisesRegex(ValueError, 'cerrándose'):
             self.app.start_job('unused')
@@ -170,6 +171,7 @@ class LocalServerTests(unittest.TestCase):
         self.assertTrue(self.app.close_if_unused(elapsed))
 
     def test_unused_launch_exits_after_startup_grace(self):
+        self.app.empty_since = 1000.0
         self.assertFalse(self.app.close_if_unused(self.app.empty_since + 119))
         self.assertTrue(self.app.close_if_unused(self.app.empty_since + 120))
 
