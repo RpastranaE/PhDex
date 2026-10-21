@@ -63,7 +63,7 @@ def check_executable(executable):
             assert request('/phdex-icon.png').startswith(b'\x89PNG')
             assert request('/api/convention')['text']
             state=request('/api/state')
-            assert Path(state['history_path'])==data_dir/'registro.sqlite3'
+            assert Path(state['history_path'])==data_dir.resolve()/'registro.sqlite3'
             request('/api/library',{'revision':0,'group':'favorites','value':{'label':'Prueba','output':str(output)}})
             item={'path':str(source),'output':str(output),'meta':{'category':'record',
                 'owner_kind':'experiment','owner_code':'EXP-12','date':'2026-10-21','content':'Ensayo'}}
